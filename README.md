@@ -2,7 +2,7 @@
 
 Token用量是一款面向 Codex 官方订阅用户的 macOS 状态栏工具。它复用本机 Codex OAuth 登录态，展示多个订阅用量周期的已用比例、剩余额度与重置时间，并提供液态玻璃风格的桌面浮窗和系统通知。
 
-> 当前状态：阶段 3 已完成，准备进入阶段 4 的通知与系统集成。
+> 当前状态：v0.1.0 候选版本。核心功能、通知、系统集成和本地发布物均已完成；公开发布仍需 Apple Developer 签名与公证凭据。
 
 ## 产品范围
 
@@ -45,6 +45,15 @@ npm run check
 npm run tauri:build
 ```
 
+生成本机可安装的 ad-hoc `.app` 与 `.dmg`：
+
+```bash
+npm run tauri -- build --bundles app
+./scripts/build-dmg.sh
+```
+
+GitHub 的 `Release macOS` 手动工作流会创建草稿 Release。签名及公证需要在仓库 Secrets 中配置 `APPLE_CERTIFICATE`、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_SIGNING_IDENTITY`、`APPLE_ID`、`APPLE_PASSWORD` 和 `APPLE_TEAM_ID`。
+
 阶段 0 的架构决策记录位于 [`docs/adr`](docs/adr)。
 
 ## 安全原则
@@ -53,3 +62,4 @@ npm run tauri:build
 - 凭据只用于请求 `https://chatgpt.com/backend-api/wham/usage`
 - 不持久化、不记录、不上传 Access Token 或 Refresh Token
 - 日志和诊断信息必须经过敏感字段脱敏
+- 本地历史仅保存标准化后的用量窗口，不包含 Token、Account ID、邮箱或原始响应

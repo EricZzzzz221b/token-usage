@@ -192,6 +192,44 @@ h1 {
   color: #5f756f;
   text-align: center;
 }
+.onboarding {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 14px;
+  margin: 26px 0;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.22);
+}
+.onboarding p {
+  margin: 0;
+  color: #607970;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.onboarding button,
+.secondary-button {
+  justify-self: start;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 13px;
+  color: white;
+  background: #2d9672;
+  cursor: pointer;
+}
+.control-sheet textarea {
+  width: 100%;
+  border: 1px solid rgba(25, 55, 47, 0.12);
+  border-radius: 10px;
+  padding: 8px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.3);
+  font:
+    10px ui-monospace,
+    monospace;
+}
 .error-state {
   display: grid;
   gap: 16px;

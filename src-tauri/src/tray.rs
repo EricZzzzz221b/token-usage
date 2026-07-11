@@ -145,7 +145,7 @@ mod tests {
     fn highest_window_drives_tray_title() {
         let view = UsageView::Ready {
             snapshot: UsageSnapshot {
-                source: "codex_oauth",
+                source: "codex_oauth".into(),
                 queried_at: 1,
                 windows: vec![
                     UsageWindow {

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageSnapshot {
-    pub source: &'static str,
+    pub source: String,
     pub windows: Vec<UsageWindow>,
     pub queried_at: i64,
 }

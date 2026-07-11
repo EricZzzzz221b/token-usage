@@ -22,6 +22,11 @@ export type UsageView =
 
 export interface RefreshSettings {
   intervalMinutes: number;
+  usageEnabled: boolean;
+  notifySeventy: boolean;
+  notifyNinety: boolean;
+  notifyHundred: boolean;
+  notifyReset: boolean;
 }
 
 export function getUsage(): Promise<UsageView> {
@@ -38,6 +43,10 @@ export function getRefreshSettings(): Promise<RefreshSettings> {
 
 export function setRefreshInterval(minutes: number): Promise<RefreshSettings> {
   return invoke<RefreshSettings>("set_refresh_interval", { minutes });
+}
+
+export function setRefreshSettings(settings: RefreshSettings): Promise<RefreshSettings> {
+  return invoke<RefreshSettings>("set_refresh_settings", { settings });
 }
 
 export function onUsageUpdated(handler: (view: UsageView) => void): Promise<UnlistenFn> {

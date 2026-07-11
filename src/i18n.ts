@@ -27,6 +27,16 @@ export const resources = {
       alwaysOnTop: "总在最前",
       lockPosition: "锁定位置",
       clickThrough: "鼠标穿透",
+      privacyTitle: "启用官方订阅用量查询",
+      privacyBody:
+        "仅在本机读取 Codex 登录凭据，并只向 chatgpt.com 查询用量。凭据不会保存、上传或分享。",
+      enableUsage: "启用用量查询",
+      notify70: "70% 提醒",
+      notify90: "90% 提醒",
+      notify100: "100% 提醒",
+      notifyReset: "额度重置后提醒",
+      launchAtLogin: "登录时启动",
+      diagnostics: "诊断报告",
       usedPercent: "已使用 {{value}}%",
       windows: { five_hour: "5 小时窗口", seven_day: "7 天窗口", thirty_day: "30 天窗口" },
       errors: {
@@ -69,6 +79,16 @@ export const resources = {
       alwaysOnTop: "Always on top",
       lockPosition: "Lock position",
       clickThrough: "Click through",
+      privacyTitle: "Enable official subscription usage",
+      privacyBody:
+        "Reads your local Codex login only to query chatgpt.com. Credentials are never stored, uploaded, or shared.",
+      enableUsage: "Enable usage checks",
+      notify70: "Notify at 70%",
+      notify90: "Notify at 90%",
+      notify100: "Notify at 100%",
+      notifyReset: "Notify after reset",
+      launchAtLogin: "Launch at login",
+      diagnostics: "Diagnostics",
       usedPercent: "{{value}}% used",
       windows: {
         five_hour: "5-hour window",

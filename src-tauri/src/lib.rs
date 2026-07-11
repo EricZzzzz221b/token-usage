@@ -51,6 +51,107 @@ async fn set_refresh_interval(
 }
 
 #[tauri::command]
+async fn set_refresh_settings(
+    coordinator: State<'_, RefreshCoordinator>,
+    settings: RefreshSettings,
+) -> Result<RefreshSettings, UsageErrorPayload> {
+    coordinator
+        .set_settings(settings)
+        .await
+        .map_err(UsageErrorPayload::from)
+}
+
+#[tauri::command]
+async fn enable_usage(
+    app: tauri::AppHandle,
+    coordinator: State<'_, RefreshCoordinator>,
+) -> Result<UsageView, UsageErrorPayload> {
+    let mut settings = coordinator.settings().await;
+    settings.usage_enabled = true;
+    coordinator
+        .set_settings(settings)
+        .await
+        .map_err(UsageErrorPayload::from)?;
+    Ok(coordinator.refresh(&app).await)
+}
+
+#[tauri::command]
+fn get_autostart(app: tauri::AppHandle) -> Result<bool, UsageErrorPayload> {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch()
+        .is_enabled()
+        .map_err(|_| UsageErrorPayload::from(error::UsageError::SettingsUnavailable))
+}
+
+#[tauri::command]
+fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool, UsageErrorPayload> {
+    use tauri_plugin_autostart::ManagerExt;
+    if enabled {
+        app.autolaunch().enable()
+    } else {
+        app.autolaunch().disable()
+    }
+    .map_err(|_| UsageErrorPayload::from(error::UsageError::SettingsUnavailable))?;
+    Ok(enabled)
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiagnosticReport {
+    app_version: String,
+    os: String,
+    credential: CredentialReport,
+    usage_status: String,
+    refresh_settings: RefreshSettings,
+}
+
+fn build_diagnostic_report(
+    app: &tauri::AppHandle,
+    view: UsageView,
+    refresh_settings: RefreshSettings,
+) -> DiagnosticReport {
+    DiagnosticReport {
+        app_version: app.package_info().version.to_string(),
+        os: std::env::consts::OS.into(),
+        credential: credentials::inspect_credentials(),
+        usage_status: match view {
+            UsageView::Loading => "loading",
+            UsageView::Ready { .. } => "ready",
+            UsageView::Error { .. } => "error",
+        }
+        .into(),
+        refresh_settings,
+    }
+}
+
+#[tauri::command]
+async fn diagnostic_report(
+    app: tauri::AppHandle,
+    coordinator: State<'_, RefreshCoordinator>,
+) -> Result<DiagnosticReport, UsageErrorPayload> {
+    let view = coordinator.view().await;
+    Ok(build_diagnostic_report(
+        &app,
+        view,
+        coordinator.settings().await,
+    ))
+}
+
+#[tauri::command]
+async fn export_diagnostic_report(
+    app: tauri::AppHandle,
+    coordinator: State<'_, RefreshCoordinator>,
+    path: String,
+) -> Result<(), UsageErrorPayload> {
+    let report =
+        build_diagnostic_report(&app, coordinator.view().await, coordinator.settings().await);
+    let encoded = serde_json::to_vec_pretty(&report)
+        .map_err(|_| UsageErrorPayload::from(error::UsageError::SettingsUnavailable))?;
+    std::fs::write(path, encoded)
+        .map_err(|_| UsageErrorPayload::from(error::UsageError::SettingsUnavailable))
+}
+
+#[tauri::command]
 fn get_window_preferences(app: tauri::AppHandle) -> WindowPreferences {
     window::load_preferences(&app)
 }
@@ -94,13 +195,31 @@ pub fn run() {
         )
         .build();
     tauri::Builder::default()
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name("Token用量")
+                .build(),
+        )
         .plugin(window_state)
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let coordinator = RefreshCoordinator::load(app.handle());
             app.manage(coordinator.clone());
             tray::setup(app, coordinator.clone())?;
             let preferences = window::load_preferences(app.handle());
             window::apply_preferences(app.handle(), &preferences)?;
+            if let Some(main) = app.get_webview_window("main") {
+                let window = main.clone();
+                main.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                });
+            }
             coordinator.start(app.handle().clone());
             Ok(())
         })
@@ -110,6 +229,12 @@ pub fn run() {
             refresh_usage,
             get_refresh_settings,
             set_refresh_interval,
+            set_refresh_settings,
+            enable_usage,
+            get_autostart,
+            set_autostart,
+            diagnostic_report,
+            export_diagnostic_report,
             get_window_preferences,
             set_window_preferences,
             start_window_drag,

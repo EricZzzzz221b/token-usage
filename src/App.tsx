@@ -6,9 +6,17 @@ import {
   onUsageUpdated,
   refreshUsage,
   setRefreshInterval,
+  setRefreshSettings,
   type RefreshSettings,
   type UsageView,
 } from "./usage";
+import {
+  enableUsage,
+  ensureNotificationPermission,
+  exportDiagnosticReport,
+  getAutostart,
+  setAutostart,
+} from "./system";
 import {
   getWindowPreferences,
   onWindowPreferences,
@@ -31,6 +39,7 @@ interface AppProps {
   reloadUsage?: () => Promise<UsageView>;
   loadSettings?: () => Promise<RefreshSettings>;
   saveInterval?: (minutes: number) => Promise<RefreshSettings>;
+  saveSettings?: (settings: RefreshSettings) => Promise<RefreshSettings>;
   subscribe?: (handler: (view: UsageView) => void) => Promise<() => void>;
   loadWindowPreferences?: () => Promise<WindowPreferences>;
   saveWindowPreferences?: (preferences: WindowPreferences) => Promise<WindowPreferences>;
@@ -38,6 +47,9 @@ interface AppProps {
   subscribeWindowPreferences?: (
     handler: (preferences: WindowPreferences) => void,
   ) => Promise<() => void>;
+  loadAutostart?: () => Promise<boolean>;
+  saveAutostart?: (enabled: boolean) => Promise<boolean>;
+  authorizeUsage?: () => Promise<UsageView>;
 }
 
 export default function App({
@@ -45,22 +57,35 @@ export default function App({
   reloadUsage = refreshUsage,
   loadSettings = getRefreshSettings,
   saveInterval = setRefreshInterval,
+  saveSettings = setRefreshSettings,
   subscribe = onUsageUpdated,
   loadWindowPreferences = getWindowPreferences,
   saveWindowPreferences = setWindowPreferences,
   dragWindow = startWindowDrag,
   subscribeWindowPreferences = onWindowPreferences,
+  loadAutostart = getAutostart,
+  saveAutostart = setAutostart,
+  authorizeUsage = enableUsage,
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
-  const [interval, setIntervalValue] = useState(5);
+  const [settings, setSettings] = useState<RefreshSettings>({
+    intervalMinutes: 5,
+    usageEnabled: false,
+    notifySeventy: false,
+    notifyNinety: true,
+    notifyHundred: true,
+    notifyReset: false,
+  });
+  const [autostart, setAutostartValue] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [showControls, setShowControls] = useState(false);
 
   useEffect(() => {
     void loadUsage().then(setView);
-    void loadSettings().then((settings) => setIntervalValue(settings.intervalMinutes));
+    void loadSettings().then(setSettings);
+    void loadAutostart().then(setAutostartValue);
     void loadWindowPreferences().then(setPreferences);
     let active = true;
     let unlisten: (() => void) | undefined;
@@ -78,7 +103,14 @@ export default function App({
       unlisten?.();
       unlistenWindow?.();
     };
-  }, [loadSettings, loadUsage, loadWindowPreferences, subscribe, subscribeWindowPreferences]);
+  }, [
+    loadAutostart,
+    loadSettings,
+    loadUsage,
+    loadWindowPreferences,
+    subscribe,
+    subscribeWindowPreferences,
+  ]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -90,10 +122,24 @@ export default function App({
   }, [reloadUsage]);
   const updateInterval = useCallback(
     async (minutes: number) => {
-      setIntervalValue(minutes);
+      setSettings((value) => ({ ...value, intervalMinutes: minutes }));
       await saveInterval(minutes);
     },
     [saveInterval],
+  );
+  const updateSettings = useCallback(
+    async (patch: Partial<RefreshSettings>) => {
+      const enablingNotification =
+        (patch.notifySeventy ?? false) ||
+        (patch.notifyNinety ?? false) ||
+        (patch.notifyHundred ?? false) ||
+        (patch.notifyReset ?? false);
+      if (enablingNotification && !(await ensureNotificationPermission())) return;
+      const next = { ...settings, ...patch };
+      setSettings(next);
+      await saveSettings(next);
+    },
+    [saveSettings, settings],
   );
   const updatePreferences = useCallback(
     async (patch: Partial<WindowPreferences>) => {
@@ -148,8 +194,28 @@ export default function App({
           </div>
         </header>
 
-        {view.status === "loading" && <p className="status-message">{t("loading")}</p>}
-        {view.status === "error" && (
+        {!settings.usageEnabled ? (
+          <div className="onboarding" role="dialog">
+            <strong>{t("privacyTitle")}</strong>
+            <p>{t("privacyBody")}</p>
+            <button
+              type="button"
+              onClick={() =>
+                void ensureNotificationPermission()
+                  .then(() => authorizeUsage())
+                  .then((next) => {
+                    setView(next);
+                    setSettings((value) => ({ ...value, usageEnabled: true }));
+                  })
+              }
+            >
+              {t("enableUsage")}
+            </button>
+          </div>
+        ) : (
+          view.status === "loading" && <p className="status-message">{t("loading")}</p>
+        )}
+        {settings.usageEnabled && view.status === "error" && (
           <div className="error-state" role="alert">
             <strong>{t(`errors.${view.code}`, { defaultValue: t("errors.unknown") })}</strong>
             <button onClick={() => void refresh()} type="button">
@@ -157,7 +223,7 @@ export default function App({
             </button>
           </div>
         )}
-        {view.status === "ready" && (
+        {settings.usageEnabled && view.status === "ready" && (
           <>
             {view.stale && <p className="stale-notice">{t("stale")}</p>}
             <div className="usage-list">
@@ -272,7 +338,7 @@ export default function App({
               <span>{t("refreshInterval")}</span>
               <select
                 onChange={(event) => void updateInterval(Number(event.target.value))}
-                value={interval}
+                value={settings.intervalMinutes}
               >
                 {[1, 5, 10, 15, 30, 60].map((minutes) => (
                   <option key={minutes} value={minutes}>
@@ -281,6 +347,56 @@ export default function App({
                 ))}
               </select>
             </label>
+            <label className="toggle-row">
+              <span>{t("notify70")}</span>
+              <input
+                checked={settings.notifySeventy}
+                type="checkbox"
+                onChange={(e) => void updateSettings({ notifySeventy: e.target.checked })}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>{t("notify90")}</span>
+              <input
+                checked={settings.notifyNinety}
+                type="checkbox"
+                onChange={(e) => void updateSettings({ notifyNinety: e.target.checked })}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>{t("notify100")}</span>
+              <input
+                checked={settings.notifyHundred}
+                type="checkbox"
+                onChange={(e) => void updateSettings({ notifyHundred: e.target.checked })}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>{t("notifyReset")}</span>
+              <input
+                checked={settings.notifyReset}
+                type="checkbox"
+                onChange={(e) => void updateSettings({ notifyReset: e.target.checked })}
+              />
+            </label>
+            <label className="toggle-row">
+              <span>{t("launchAtLogin")}</span>
+              <input
+                checked={autostart}
+                type="checkbox"
+                onChange={(e) => {
+                  setAutostartValue(e.target.checked);
+                  void saveAutostart(e.target.checked);
+                }}
+              />
+            </label>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => void exportDiagnosticReport()}
+            >
+              {t("diagnostics")}
+            </button>
             <button
               className="language-button"
               onClick={() => void i18n.changeLanguage(i18n.language === "zh" ? "en" : "zh")}

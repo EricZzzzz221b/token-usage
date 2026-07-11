@@ -2,6 +2,7 @@ use std::{fs, path::PathBuf, sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Mutex;
 
 use crate::{credentials, error::UsageError, model::UsageSnapshot, tray, usage::UsageClient};
@@ -15,12 +16,27 @@ const LAST_GOOD_GRACE_MILLIS: i64 = 30 * 60 * 1_000;
 #[serde(rename_all = "camelCase")]
 pub struct RefreshSettings {
     pub interval_minutes: u64,
+    #[serde(default)]
+    pub usage_enabled: bool,
+    #[serde(default)]
+    pub notify_seventy: bool,
+    #[serde(default = "default_true")]
+    pub notify_ninety: bool,
+    #[serde(default = "default_true")]
+    pub notify_hundred: bool,
+    #[serde(default)]
+    pub notify_reset: bool,
 }
 
 impl Default for RefreshSettings {
     fn default() -> Self {
         Self {
             interval_minutes: DEFAULT_INTERVAL_MINUTES,
+            usage_enabled: false,
+            notify_seventy: false,
+            notify_ninety: true,
+            notify_hundred: true,
+            notify_reset: false,
         }
     }
 }
@@ -46,6 +62,7 @@ struct CoordinatorState {
     last_good: Option<UsageSnapshot>,
     last_error: Option<String>,
     refreshing: bool,
+    notified: std::collections::HashSet<String>,
 }
 
 #[derive(Clone)]
@@ -78,11 +95,27 @@ impl RefreshCoordinator {
     pub fn start(&self, app: AppHandle) {
         let coordinator = self.clone();
         tauri::async_runtime::spawn(async move {
-            coordinator.refresh(&app).await;
-            loop {
-                let minutes = coordinator.settings().await.interval_minutes;
-                tokio::time::sleep(Duration::from_secs(minutes * 60)).await;
+            if coordinator.settings().await.usage_enabled {
                 coordinator.refresh(&app).await;
+            }
+            loop {
+                let state = coordinator.state.lock().await;
+                let retry_soon = state.last_error.as_deref().is_some_and(|code| {
+                    matches!(
+                        code,
+                        "network_unavailable" | "rate_limited" | "server_unavailable"
+                    )
+                });
+                let seconds = if retry_soon {
+                    30
+                } else {
+                    state.settings.interval_minutes * 60
+                };
+                drop(state);
+                tokio::time::sleep(Duration::from_secs(seconds)).await;
+                if coordinator.settings().await.usage_enabled {
+                    coordinator.refresh(&app).await;
+                }
             }
         });
     }
@@ -92,9 +125,22 @@ impl RefreshCoordinator {
     }
 
     pub async fn set_interval(&self, minutes: u64) -> Result<RefreshSettings, UsageError> {
-        let settings = RefreshSettings {
-            interval_minutes: minutes,
-        };
+        let mut settings = self.settings().await;
+        settings.interval_minutes = minutes;
+        self.save_settings(settings).await
+    }
+
+    pub async fn set_settings(
+        &self,
+        settings: RefreshSettings,
+    ) -> Result<RefreshSettings, UsageError> {
+        self.save_settings(settings).await
+    }
+
+    async fn save_settings(
+        &self,
+        settings: RefreshSettings,
+    ) -> Result<RefreshSettings, UsageError> {
         if !valid_settings(&settings) {
             return Err(UsageError::InvalidSettings);
         }
@@ -131,6 +177,30 @@ impl RefreshCoordinator {
             state.refreshing = false;
             match result {
                 Ok(snapshot) => {
+                    if state.settings.notify_reset {
+                        if let Some(previous) = &state.last_good {
+                            for current in &snapshot.windows {
+                                if let Some(old) = previous
+                                    .windows
+                                    .iter()
+                                    .find(|window| window.id == current.id)
+                                {
+                                    if old.used_percent > current.used_percent
+                                        && old.reset_at != current.reset_at
+                                    {
+                                        let _ = app
+                                            .notification()
+                                            .builder()
+                                            .title("Token用量")
+                                            .body(format!("{} 已重置", current.label))
+                                            .show();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    process_notifications(app, &mut state, &snapshot);
+                    append_snapshot(app, &snapshot);
                     state.last_good = Some(snapshot);
                     state.last_error = None;
                 }
@@ -147,6 +217,76 @@ impl RefreshCoordinator {
         tray::update(app, &view);
         view
     }
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn process_notifications(app: &AppHandle, state: &mut CoordinatorState, snapshot: &UsageSnapshot) {
+    for window in &snapshot.windows {
+        for (threshold, enabled) in [
+            (70, state.settings.notify_seventy),
+            (90, state.settings.notify_ninety),
+            (100, state.settings.notify_hundred),
+        ] {
+            let key = format!(
+                "{}:{}:{}",
+                window.id,
+                window.reset_at.unwrap_or_default(),
+                threshold
+            );
+            if enabled && window.used_percent >= threshold as f64 && state.notified.insert(key) {
+                let _ = app
+                    .notification()
+                    .builder()
+                    .title("Token用量")
+                    .body(format!(
+                        "{} 已使用 {:.0}%",
+                        window.label, window.used_percent
+                    ))
+                    .show();
+            }
+        }
+    }
+    state.notified.retain(|key| {
+        snapshot.windows.iter().any(|window| {
+            key.starts_with(&format!(
+                "{}:{}:",
+                window.id,
+                window.reset_at.unwrap_or_default()
+            ))
+        })
+    });
+}
+
+fn append_snapshot(app: &AppHandle, snapshot: &UsageSnapshot) {
+    let Ok(dir) = app.path().app_data_dir() else {
+        return;
+    };
+    if fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let path = dir.join("usage-history.jsonl");
+    let cutoff = now_millis() - 30 * 24 * 60 * 60 * 1_000;
+    let history = fs::read_to_string(&path).unwrap_or_default();
+    let mut retained = history
+        .lines()
+        .filter_map(|line| serde_json::from_str::<UsageSnapshot>(line).ok())
+        .filter(|item| item.queried_at >= cutoff)
+        .collect::<Vec<_>>();
+    retained.push(snapshot.clone());
+    if retained.len() > 8_640 {
+        retained.drain(..retained.len() - 8_640);
+    }
+    let mut output = Vec::new();
+    for item in retained {
+        if let Ok(mut line) = serde_json::to_vec(&item) {
+            line.push(b'\n');
+            output.extend(line);
+        }
+    }
+    let _ = fs::write(path, output);
 }
 
 fn valid_settings(settings: &RefreshSettings) -> bool {
@@ -183,13 +323,16 @@ mod tests {
     #[test]
     fn validates_refresh_interval_bounds() {
         assert!(!valid_settings(&RefreshSettings {
-            interval_minutes: 0
+            interval_minutes: 0,
+            ..RefreshSettings::default()
         }));
         assert!(valid_settings(&RefreshSettings {
-            interval_minutes: 5
+            interval_minutes: 5,
+            ..RefreshSettings::default()
         }));
         assert!(!valid_settings(&RefreshSettings {
-            interval_minutes: 1_441
+            interval_minutes: 1_441,
+            ..RefreshSettings::default()
         }));
     }
 
@@ -198,7 +341,7 @@ mod tests {
         let state = CoordinatorState {
             settings: RefreshSettings::default(),
             last_good: Some(UsageSnapshot {
-                source: "codex_oauth",
+                source: "codex_oauth".into(),
                 windows: vec![UsageWindow {
                     id: "five_hour".into(),
                     label: "5 hours".into(),
@@ -210,6 +353,7 @@ mod tests {
             }),
             last_error: Some("network_unavailable".into()),
             refreshing: false,
+            notified: Default::default(),
         };
         match view_from_state(&state, 2_000) {
             UsageView::Ready { last_error, .. } => {
@@ -226,6 +370,7 @@ mod tests {
             last_good: None,
             last_error: Some("authentication_expired".into()),
             refreshing: false,
+            notified: Default::default(),
         };
         match view_from_state(&state, 2_000) {
             UsageView::Error { code, .. } => assert_eq!(code, "authentication_expired"),

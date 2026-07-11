@@ -83,7 +83,7 @@ fn normalize(body: CodexUsageResponse) -> Result<UsageSnapshot, UsageError> {
         return Err(UsageError::ResponseIncompatible);
     }
     Ok(UsageSnapshot {
-        source: "codex_oauth",
+        source: "codex_oauth".into(),
         windows,
         queried_at: now_millis(),
     })
