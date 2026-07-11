@@ -26,3 +26,8 @@ auth.json
 # Temporary reference material
 work/
 
+# Tauri generated schemas
+src-tauri/gen/
+
+# TypeScript incremental build metadata
+*.tsbuildinfo

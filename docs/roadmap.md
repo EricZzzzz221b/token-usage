@@ -2,6 +2,8 @@
 
 ## 阶段 0：项目基础
 
+状态：已完成（2026-07-11）。
+
 目标：建立可重复开发、测试和发布的项目骨架。
 
 交付：
@@ -14,6 +16,16 @@
 - ADR（架构决策记录）目录
 
 退出条件：全新环境可以完成安装、开发启动、测试和打包。
+
+完成证据：
+
+- Node 22 与 Rust stable 工具链约束
+- npm 与 Cargo 锁文件
+- Prettier、ESLint、TypeScript、Vitest、rustfmt 与 Clippy
+- macOS GitHub Actions CI
+- 中英文基础资源和可访问进度条示例
+- Tauri release 构建成功
+- ADR 0001 与 ADR 0002
 
 ## 阶段 1：真实用量闭环
 
@@ -104,4 +116,3 @@
 - Windows 版本
 - 自动更新
 - 多账号只读监控
-

@@ -82,31 +82,31 @@
 
 ## 3. 工作包拆解
 
-| 编号 | 工作包 | 依赖 | 优先级 |
-| --- | --- | --- | --- |
-| CORE-01 | 内部 UsageSnapshot 模型 | 无 | P0 |
-| AUTH-01 | `auth.json` 解析 | CORE-01 | P0 |
-| AUTH-02 | macOS Keychain 读取 | AUTH-01 | P0 |
-| AUTH-03 | 凭据脱敏与安全测试 | AUTH-01 | P0 |
-| API-01 | 官方用量客户端 | CORE-01, AUTH-01 | P0 |
-| API-02 | 响应标准化和周期映射 | API-01 | P0 |
-| API-03 | 错误分类和重试 | API-01 | P0 |
-| DATA-01 | last-good 状态机 | API-03 | P0 |
-| DATA-02 | 非敏感快照存储 | CORE-01 | P1 |
-| UI-01 | 进度条组件 | CORE-01 | P0 |
-| UI-02 | 菜单栏弹层 | UI-01 | P0 |
-| UI-03 | 动态状态栏图标/百分比 | UI-02 | P0 |
-| UI-04 | 液态玻璃浮窗 | UI-01 | P0 |
-| UI-05 | 紧凑/详细模式 | UI-04 | P0 |
-| UI-06 | 主题与可访问性 | UI-04 | P1 |
-| SYS-01 | 刷新调度器 | API-03 | P0 |
-| SYS-02 | 睡眠和网络恢复 | SYS-01 | P1 |
-| SYS-03 | 开机启动 | 无 | P1 |
-| NOTIFY-01 | 阈值通知状态机 | DATA-01 | P1 |
-| DIAG-01 | 白名单诊断导出 | AUTH-03 | P1 |
-| RELEASE-01 | CI 构建 | 项目骨架 | P0 |
-| RELEASE-02 | 签名与 notarization | RELEASE-01 | P0 |
-| RELEASE-03 | DMG 和发布验证 | RELEASE-02 | P0 |
+| 编号       | 工作包                  | 依赖             | 优先级 |
+| ---------- | ----------------------- | ---------------- | ------ |
+| CORE-01    | 内部 UsageSnapshot 模型 | 无               | P0     |
+| AUTH-01    | `auth.json` 解析        | CORE-01          | P0     |
+| AUTH-02    | macOS Keychain 读取     | AUTH-01          | P0     |
+| AUTH-03    | 凭据脱敏与安全测试      | AUTH-01          | P0     |
+| API-01     | 官方用量客户端          | CORE-01, AUTH-01 | P0     |
+| API-02     | 响应标准化和周期映射    | API-01           | P0     |
+| API-03     | 错误分类和重试          | API-01           | P0     |
+| DATA-01    | last-good 状态机        | API-03           | P0     |
+| DATA-02    | 非敏感快照存储          | CORE-01          | P1     |
+| UI-01      | 进度条组件              | CORE-01          | P0     |
+| UI-02      | 菜单栏弹层              | UI-01            | P0     |
+| UI-03      | 动态状态栏图标/百分比   | UI-02            | P0     |
+| UI-04      | 液态玻璃浮窗            | UI-01            | P0     |
+| UI-05      | 紧凑/详细模式           | UI-04            | P0     |
+| UI-06      | 主题与可访问性          | UI-04            | P1     |
+| SYS-01     | 刷新调度器              | API-03           | P0     |
+| SYS-02     | 睡眠和网络恢复          | SYS-01           | P1     |
+| SYS-03     | 开机启动                | 无               | P1     |
+| NOTIFY-01  | 阈值通知状态机          | DATA-01          | P1     |
+| DIAG-01    | 白名单诊断导出          | AUTH-03          | P1     |
+| RELEASE-01 | CI 构建                 | 项目骨架         | P0     |
+| RELEASE-02 | 签名与 notarization     | RELEASE-01       | P0     |
+| RELEASE-03 | DMG 和发布验证          | RELEASE-02       | P0     |
 
 ## 4. Definition of Done
 
@@ -154,4 +154,3 @@
 5. 验证日志中不存在 token。
 
 完成这个切片后，再接触真实 Keychain 和官方端点，能显著降低凭据处理和 UI 同时调试的风险。
-

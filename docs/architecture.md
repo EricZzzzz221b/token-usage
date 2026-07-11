@@ -179,4 +179,3 @@ pub enum UsageError {
 - Release 构建必须签名并 notarize
 - 发布物包含隐私说明和第三方许可证
 - 自动更新在签名与回滚流程验证完成后启用
-
