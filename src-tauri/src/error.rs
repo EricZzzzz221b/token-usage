@@ -21,6 +21,10 @@ pub enum UsageError {
     ServerUnavailable,
     #[error("The usage response is incompatible")]
     ResponseIncompatible,
+    #[error("The refresh interval is invalid")]
+    InvalidSettings,
+    #[error("Refresh settings could not be saved")]
+    SettingsUnavailable,
 }
 
 impl UsageError {
@@ -35,7 +39,16 @@ impl UsageError {
             Self::RateLimited => "rate_limited",
             Self::ServerUnavailable => "server_unavailable",
             Self::ResponseIncompatible => "response_incompatible",
+            Self::InvalidSettings => "invalid_settings",
+            Self::SettingsUnavailable => "settings_unavailable",
         }
+    }
+
+    pub fn is_transient(&self) -> bool {
+        matches!(
+            self,
+            Self::NetworkUnavailable | Self::RateLimited | Self::ServerUnavailable
+        )
     }
 }
 

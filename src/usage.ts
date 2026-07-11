@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export interface UsageWindow {
   id: string;
@@ -14,21 +15,31 @@ export interface UsageSnapshot {
   queriedAt: number;
 }
 
-export interface UsageErrorPayload {
-  code: string;
-  message: string;
+export type UsageView =
+  | { status: "loading" }
+  | { status: "ready"; snapshot: UsageSnapshot; stale: boolean; lastError?: string }
+  | { status: "error"; code: string; message: string };
+
+export interface RefreshSettings {
+  intervalMinutes: number;
 }
 
-export async function fetchUsage(): Promise<UsageSnapshot> {
-  return invoke<UsageSnapshot>("fetch_usage");
+export function getUsage(): Promise<UsageView> {
+  return invoke<UsageView>("get_usage");
 }
 
-export function normalizeInvokeError(error: unknown): UsageErrorPayload {
-  if (typeof error === "object" && error !== null && "code" in error && "message" in error) {
-    return {
-      code: String(error.code),
-      message: String(error.message),
-    };
-  }
-  return { code: "unknown", message: String(error) };
+export function refreshUsage(): Promise<UsageView> {
+  return invoke<UsageView>("refresh_usage");
+}
+
+export function getRefreshSettings(): Promise<RefreshSettings> {
+  return invoke<RefreshSettings>("get_refresh_settings");
+}
+
+export function setRefreshInterval(minutes: number): Promise<RefreshSettings> {
+  return invoke<RefreshSettings>("set_refresh_interval", { minutes });
+}
+
+export function onUsageUpdated(handler: (view: UsageView) => void): Promise<UnlistenFn> {
+  return listen<UsageView>("usage://updated", (event) => handler(event.payload));
 }

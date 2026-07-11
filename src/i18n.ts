@@ -5,9 +5,13 @@ export const resources = {
   zh: {
     translation: {
       appName: "Token用量",
-      phaseOne: "阶段 1 · OAuth 用量闭环",
+      phaseTwo: "阶段 2 · 菜单栏 MVP",
       loading: "正在读取 Codex 用量…",
+      refresh: "立即刷新",
       retry: "重新尝试",
+      stale: "正在显示上次成功数据",
+      refreshInterval: "自动刷新",
+      minutes: "{{count}} 分钟",
       usedPercent: "已使用 {{value}}%",
       windows: { five_hour: "5 小时窗口", seven_day: "7 天窗口", thirty_day: "30 天窗口" },
       errors: {
@@ -27,9 +31,14 @@ export const resources = {
   en: {
     translation: {
       appName: "Token Usage",
-      phaseOne: "Phase 1 · OAuth usage loop",
+      phaseTwo: "Phase 2 · Menu bar MVP",
       loading: "Reading Codex usage…",
+      refresh: "Refresh now",
       retry: "Try again",
+      stale: "Showing the last successful update",
+      refreshInterval: "Auto refresh",
+      minutes: "{{count}} minute",
+      minutes_other: "{{count}} minutes",
       usedPercent: "{{value}}% used",
       windows: {
         five_hour: "5-hour window",
