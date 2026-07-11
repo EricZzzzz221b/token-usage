@@ -1,7 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    App, AppHandle, Manager,
+    App, AppHandle, Emitter, Manager,
 };
 
 use crate::refresh::{RefreshCoordinator, UsageView};
@@ -10,6 +10,8 @@ const TRAY_ID: &str = "token-usage";
 const SUMMARY_ID: &str = "usage-summary";
 const SHOW_ID: &str = "show-window";
 const REFRESH_ID: &str = "refresh-usage";
+const MODE_ID: &str = "toggle-window-mode";
+const INTERACTION_ID: &str = "restore-interaction";
 const QUIT_ID: &str = "quit";
 
 pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()> {
@@ -30,6 +32,18 @@ pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()
                     coordinator.refresh(&app).await;
                 });
             }
+            MODE_ID => {
+                let mut preferences = crate::window::load_preferences(app);
+                preferences.mode = match preferences.mode {
+                    crate::window::WindowMode::Compact => crate::window::WindowMode::Detailed,
+                    crate::window::WindowMode::Detailed => crate::window::WindowMode::Compact,
+                };
+                let _ = crate::window::apply_preferences(app, &preferences);
+                let _ = crate::window::save_preferences(app, &preferences);
+                let _ = app.emit("window://preferences", &preferences);
+                show_window(app);
+            }
+            INTERACTION_ID => crate::window::disable_click_through(app),
             QUIT_ID => app.exit(0),
             _ => {}
         });
@@ -59,9 +73,23 @@ fn build_menu<R: tauri::Runtime, M: Manager<R>>(
     let summary = MenuItem::with_id(manager, SUMMARY_ID, summary_text, false, None::<&str>)?;
     let show = MenuItem::with_id(manager, SHOW_ID, "显示 Token用量", true, None::<&str>)?;
     let refresh = MenuItem::with_id(manager, REFRESH_ID, "立即刷新", true, None::<&str>)?;
+    let mode = MenuItem::with_id(manager, MODE_ID, "切换紧凑/详细模式", true, None::<&str>)?;
+    let interaction =
+        MenuItem::with_id(manager, INTERACTION_ID, "恢复浮窗交互", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(manager)?;
     let quit = MenuItem::with_id(manager, QUIT_ID, "退出", true, None::<&str>)?;
-    Menu::with_items(manager, &[&summary, &show, &refresh, &separator, &quit])
+    Menu::with_items(
+        manager,
+        &[
+            &summary,
+            &show,
+            &refresh,
+            &mode,
+            &interaction,
+            &separator,
+            &quit,
+        ],
+    )
 }
 
 fn show_window(app: &AppHandle) {

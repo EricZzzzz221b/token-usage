@@ -25,6 +25,10 @@ pub enum UsageError {
     InvalidSettings,
     #[error("Refresh settings could not be saved")]
     SettingsUnavailable,
+    #[error("Window settings could not be saved")]
+    WindowSettingsUnavailable,
+    #[error("The main window is unavailable")]
+    WindowUnavailable,
 }
 
 impl UsageError {
@@ -41,6 +45,8 @@ impl UsageError {
             Self::ResponseIncompatible => "response_incompatible",
             Self::InvalidSettings => "invalid_settings",
             Self::SettingsUnavailable => "settings_unavailable",
+            Self::WindowSettingsUnavailable => "window_settings_unavailable",
+            Self::WindowUnavailable => "window_unavailable",
         }
     }
 
