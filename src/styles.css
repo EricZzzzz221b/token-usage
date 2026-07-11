@@ -64,6 +64,29 @@ h1 {
   gap: 22px;
   margin: 28px 0;
 }
+.status-message {
+  margin: 42px 0;
+  color: #5f756f;
+  text-align: center;
+}
+.error-state {
+  display: grid;
+  gap: 16px;
+  margin: 28px 0;
+  padding: 18px;
+  border: 1px solid rgba(196, 75, 68, 0.2);
+  border-radius: 16px;
+  background: rgba(255, 238, 236, 0.48);
+}
+.error-state button {
+  justify-self: start;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 13px;
+  color: #fff;
+  background: #b64d45;
+  cursor: pointer;
+}
 .usage-window {
   display: grid;
   gap: 9px;
@@ -116,6 +139,13 @@ footer {
   }
   .progress-track {
     background: rgba(255, 255, 255, 0.12);
+  }
+  .status-message {
+    color: #a1bbb2;
+  }
+  .error-state {
+    border-color: rgba(255, 138, 129, 0.22);
+    background: rgba(94, 30, 26, 0.32);
   }
 }
 

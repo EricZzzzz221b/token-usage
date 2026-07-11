@@ -1,12 +1,37 @@
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import {
+  fetchUsage,
+  normalizeInvokeError,
+  type UsageErrorPayload,
+  type UsageSnapshot,
+} from "./usage";
 
-const windows = [
-  { key: "fiveHour", used: 42 },
-  { key: "sevenDay", used: 68 },
-] as const;
+interface AppProps {
+  loadUsage?: () => Promise<UsageSnapshot>;
+}
 
-export default function App() {
+type ViewState =
+  | { status: "loading" }
+  | { status: "ready"; snapshot: UsageSnapshot }
+  | { status: "error"; error: UsageErrorPayload };
+
+export default function App({ loadUsage = fetchUsage }: AppProps) {
   const { t, i18n } = useTranslation();
+  const [state, setState] = useState<ViewState>({ status: "loading" });
+
+  const refresh = useCallback(async () => {
+    setState({ status: "loading" });
+    try {
+      setState({ status: "ready", snapshot: await loadUsage() });
+    } catch (error) {
+      setState({ status: "error", error: normalizeInvokeError(error) });
+    }
+  }, [loadUsage]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   return (
     <main className="app-shell">
@@ -25,28 +50,46 @@ export default function App() {
           </button>
         </header>
 
-        <div className="usage-list">
-          {windows.map((window) => (
-            <article className="usage-window" key={window.key}>
-              <div className="usage-heading">
-                <span>{t(`windows.${window.key}`)}</span>
-                <strong>{window.used}%</strong>
-              </div>
-              <div
-                aria-label={t("usedPercent", { value: window.used })}
-                aria-valuemax={100}
-                aria-valuemin={0}
-                aria-valuenow={window.used}
-                className="progress-track"
-                role="progressbar"
-              >
-                <span className="progress-fill" style={{ width: `${window.used}%` }} />
-              </div>
-            </article>
-          ))}
-        </div>
+        {state.status === "loading" && <p className="status-message">{t("loading")}</p>}
 
-        <footer>{t("phaseZero")}</footer>
+        {state.status === "error" && (
+          <div className="error-state" role="alert">
+            <strong>
+              {t(`errors.${state.error.code}`, { defaultValue: t("errors.unknown") })}
+            </strong>
+            <button onClick={() => void refresh()} type="button">
+              {t("retry")}
+            </button>
+          </div>
+        )}
+
+        {state.status === "ready" && (
+          <div className="usage-list">
+            {state.snapshot.windows.map((window) => {
+              const used = Math.round(window.usedPercent);
+              return (
+                <article className="usage-window" key={window.id}>
+                  <div className="usage-heading">
+                    <span>{t(`windows.${window.id}`, { defaultValue: window.label })}</span>
+                    <strong>{used}%</strong>
+                  </div>
+                  <div
+                    aria-label={t("usedPercent", { value: used })}
+                    aria-valuemax={100}
+                    aria-valuemin={0}
+                    aria-valuenow={used}
+                    className="progress-track"
+                    role="progressbar"
+                  >
+                    <span className="progress-fill" style={{ width: `${used}%` }} />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        <footer>{t("phaseOne")}</footer>
       </section>
     </main>
   );
