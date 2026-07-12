@@ -1,4 +1,5 @@
 use tauri::{
+    image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     App, AppHandle, Emitter, Manager,
@@ -17,7 +18,7 @@ const QUIT_ID: &str = "quit";
 pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()> {
     let menu = build_menu(app, "正在读取用量…")?;
 
-    let icon = app.default_window_icon().cloned();
+    let icon = Image::from_bytes(include_bytes!("../icons/status-bar.png")).ok();
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
         .tooltip("Token用量")
@@ -38,9 +39,15 @@ pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()
                     crate::window::WindowMode::Compact => crate::window::WindowMode::Detailed,
                     crate::window::WindowMode::Detailed => crate::window::WindowMode::Compact,
                 };
+                let view = match preferences.mode {
+                    crate::window::WindowMode::Compact => "compact",
+                    crate::window::WindowMode::Detailed => "detailed",
+                };
                 let _ = crate::window::apply_preferences(app, &preferences);
+                let _ = crate::window::resize_for_view(app, view);
                 let _ = crate::window::save_preferences(app, &preferences);
                 let _ = app.emit("window://preferences", &preferences);
+                let _ = app.emit("window://mode-changed", &preferences);
                 show_window(app);
             }
             INTERACTION_ID => crate::window::disable_click_through(app),
@@ -114,21 +121,24 @@ fn tray_text(view: &UsageView) -> (String, String, String) {
         UsageView::Ready {
             snapshot, stale, ..
         } => {
-            let max = snapshot
+            let remaining = snapshot
                 .windows
                 .iter()
-                .map(|window| window.used_percent.round() as i64)
-                .max()
-                .unwrap_or(0);
+                .map(|window| (100.0 - window.used_percent).clamp(0.0, 100.0).round() as i64)
+                .min()
+                .unwrap_or(100);
             let title = if *stale {
-                format!("~{max}%")
+                format!("~{remaining}%")
             } else {
-                format!("{max}%")
+                format!("{remaining}%")
             };
             let details = snapshot
                 .windows
                 .iter()
-                .map(|window| format!("{} {:.0}%", window.label, window.used_percent))
+                .map(|window| {
+                    let remaining = (100.0 - window.used_percent).clamp(0.0, 100.0);
+                    format!("{} 剩余 {:.0}%", window.label, remaining)
+                })
                 .collect::<Vec<_>>()
                 .join(" · ");
             (title, format!("Token用量 · {details}"), details)
@@ -142,7 +152,7 @@ mod tests {
     use crate::model::{UsageSnapshot, UsageWindow};
 
     #[test]
-    fn highest_window_drives_tray_title() {
+    fn lowest_remaining_window_drives_tray_title() {
         let view = UsageView::Ready {
             snapshot: UsageSnapshot {
                 source: "codex_oauth".into(),
@@ -167,6 +177,6 @@ mod tests {
             stale: false,
             last_error: None,
         };
-        assert_eq!(tray_text(&view).0, "68%");
+        assert_eq!(tray_text(&view).0, "32%");
     }
 }

@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { save } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 
 export interface DiagnosticReport {
@@ -18,14 +17,4 @@ export const enableUsage = () => invoke<import("./usage").UsageView>("enable_usa
 export async function ensureNotificationPermission(): Promise<boolean> {
   if (await isPermissionGranted()) return true;
   return (await requestPermission()) === "granted";
-}
-
-export async function exportDiagnosticReport(): Promise<boolean> {
-  const path = await save({
-    defaultPath: "token-usage-diagnostics.json",
-    filters: [{ name: "JSON", extensions: ["json"] }],
-  });
-  if (!path) return false;
-  await invoke("export_diagnostic_report", { path });
-  return true;
 }

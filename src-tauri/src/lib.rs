@@ -10,7 +10,7 @@ use credentials::CredentialReport;
 use error::UsageErrorPayload;
 use refresh::{RefreshCoordinator, RefreshSettings, UsageView};
 use tauri::{Manager, State};
-use window::{GlassStrength, WindowPreferences};
+use window::WindowPreferences;
 
 #[tauri::command]
 fn credential_status() -> CredentialReport {
@@ -179,24 +179,17 @@ fn start_window_drag(app: tauri::AppHandle) -> Result<(), UsageErrorPayload> {
 }
 
 #[tauri::command]
-fn set_glass_strength(
-    app: tauri::AppHandle,
-    strength: GlassStrength,
-) -> Result<(), UsageErrorPayload> {
-    window::apply_glass(&app, strength).map_err(UsageErrorPayload::from)
+fn resize_window_for_view(app: tauri::AppHandle, view: String) -> Result<(), UsageErrorPayload> {
+    window::resize_for_view(&app, &view).map_err(UsageErrorPayload::from)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let window_state = tauri_plugin_window_state::Builder::default()
-        .with_state_flags(
-            tauri_plugin_window_state::StateFlags::POSITION
-                | tauri_plugin_window_state::StateFlags::SIZE,
-        )
+        .with_state_flags(tauri_plugin_window_state::StateFlags::POSITION)
         .build();
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .app_name("Token用量")
@@ -210,7 +203,12 @@ pub fn run() {
             app.manage(coordinator.clone());
             tray::setup(app, coordinator.clone())?;
             let preferences = window::load_preferences(app.handle());
+            let initial_view = match preferences.mode {
+                window::WindowMode::Compact => "compact",
+                window::WindowMode::Detailed => "detailed",
+            };
             window::apply_preferences(app.handle(), &preferences)?;
+            window::resize_for_view(app.handle(), initial_view)?;
             if let Some(main) = app.get_webview_window("main") {
                 let window = main.clone();
                 main.on_window_event(move |event| {
@@ -238,7 +236,7 @@ pub fn run() {
             get_window_preferences,
             set_window_preferences,
             start_window_drag,
-            set_glass_strength
+            resize_window_for_view
         ])
         .run(tauri::generate_context!())
         .expect("error while running Token Usage");

@@ -242,8 +242,9 @@ fn process_notifications(app: &AppHandle, state: &mut CoordinatorState, snapshot
                     .builder()
                     .title("Token用量")
                     .body(format!(
-                        "{} 已使用 {:.0}%",
-                        window.label, window.used_percent
+                        "{} 剩余 {:.0}%",
+                        window.label,
+                        (100.0 - window.used_percent).clamp(0.0, 100.0)
                     ))
                     .show();
             }

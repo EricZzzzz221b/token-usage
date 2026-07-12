@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
 import {
   getRefreshSettings,
@@ -10,16 +11,12 @@ import {
   type RefreshSettings,
   type UsageView,
 } from "./usage";
-import {
-  enableUsage,
-  ensureNotificationPermission,
-  exportDiagnosticReport,
-  getAutostart,
-  setAutostart,
-} from "./system";
+import { enableUsage, ensureNotificationPermission, getAutostart, setAutostart } from "./system";
 import {
   getWindowPreferences,
+  onWindowModeChanged,
   onWindowPreferences,
+  resizeWindowForView,
   setWindowPreferences,
   startWindowDrag,
   type WindowPreferences,
@@ -30,8 +27,7 @@ const defaultWindowPreferences: WindowPreferences = {
   alwaysOnTop: true,
   locked: false,
   clickThrough: false,
-  opacity: 0.86,
-  glassStrength: "standard",
+  glassLevel: 0.5,
 };
 
 interface AppProps {
@@ -47,9 +43,32 @@ interface AppProps {
   subscribeWindowPreferences?: (
     handler: (preferences: WindowPreferences) => void,
   ) => Promise<() => void>;
+  subscribeWindowModeChanged?: (
+    handler: (preferences: WindowPreferences) => void,
+  ) => Promise<() => void>;
   loadAutostart?: () => Promise<boolean>;
   saveAutostart?: (enabled: boolean) => Promise<boolean>;
+  loadAppVersion?: () => Promise<string>;
   authorizeUsage?: () => Promise<UsageView>;
+  resizeView?: (view: "compact" | "detailed" | "settings") => Promise<void>;
+}
+
+function remainingPercent(usedPercent: number) {
+  return Math.max(0, Math.min(100, 100 - Math.round(usedPercent)));
+}
+
+function riskClass(remaining: number) {
+  if (remaining <= 0) return "limit";
+  if (remaining <= 10) return "critical";
+  if (remaining <= 30) return "warning";
+  return "neutral";
+}
+
+function windowShortLabel(id: string) {
+  if (id === "five_hour") return "5h";
+  if (id === "seven_day") return "7d";
+  if (id === "thirty_day") return "30d";
+  return id;
 }
 
 export default function App({
@@ -63,9 +82,12 @@ export default function App({
   saveWindowPreferences = setWindowPreferences,
   dragWindow = startWindowDrag,
   subscribeWindowPreferences = onWindowPreferences,
+  subscribeWindowModeChanged = onWindowModeChanged,
   loadAutostart = getAutostart,
   saveAutostart = setAutostart,
+  loadAppVersion = getVersion,
   authorizeUsage = enableUsage,
+  resizeView = resizeWindowForView,
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
@@ -78,38 +100,51 @@ export default function App({
     notifyReset: false,
   });
   const [autostart, setAutostartValue] = useState(false);
+  const [appVersion, setAppVersion] = useState("1.1.0");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
-  const [showControls, setShowControls] = useState(false);
+  const [screen, setScreen] = useState<"meter" | "settings">("meter");
+  const preferencesRef = useRef(defaultWindowPreferences);
+  const preferenceSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
     void loadUsage().then(setView);
     void loadSettings().then(setSettings);
     void loadAutostart().then(setAutostartValue);
-    void loadWindowPreferences().then(setPreferences);
+    void loadAppVersion().then(setAppVersion);
+    void loadWindowPreferences().then((next) => {
+      preferencesRef.current = next;
+      setPreferences(next);
+    });
     let active = true;
     let unlisten: (() => void) | undefined;
     let unlistenWindow: (() => void) | undefined;
-    void subscribe(setView).then((cleanup) => {
-      if (active) unlisten = cleanup;
-      else cleanup();
-    });
-    void subscribeWindowPreferences(setPreferences).then((cleanup) => {
-      if (active) unlistenWindow = cleanup;
-      else cleanup();
-    });
+    let unlistenMode: (() => void) | undefined;
+    void subscribe(setView).then((cleanup) => (active ? (unlisten = cleanup) : cleanup()));
+    void subscribeWindowPreferences((next) => {
+      preferencesRef.current = next;
+      setPreferences(next);
+    }).then((cleanup) => (active ? (unlistenWindow = cleanup) : cleanup()));
+    void subscribeWindowModeChanged((next) => {
+      preferencesRef.current = next;
+      setPreferences(next);
+      setScreen("meter");
+    }).then((cleanup) => (active ? (unlistenMode = cleanup) : cleanup()));
     return () => {
       active = false;
       unlisten?.();
       unlistenWindow?.();
+      unlistenMode?.();
     };
   }, [
     loadAutostart,
+    loadAppVersion,
     loadSettings,
     loadUsage,
     loadWindowPreferences,
     subscribe,
     subscribeWindowPreferences,
+    subscribeWindowModeChanged,
   ]);
 
   const refresh = useCallback(async () => {
@@ -120,294 +155,439 @@ export default function App({
       setRefreshing(false);
     }
   }, [reloadUsage]);
-  const updateInterval = useCallback(
-    async (minutes: number) => {
-      setSettings((value) => ({ ...value, intervalMinutes: minutes }));
-      await saveInterval(minutes);
-    },
-    [saveInterval],
-  );
+
+  const authorize = useCallback(async () => {
+    const next = await authorizeUsage();
+    setView(next);
+    setSettings((current) => ({ ...current, usageEnabled: true }));
+  }, [authorizeUsage]);
+
   const updateSettings = useCallback(
     async (patch: Partial<RefreshSettings>) => {
-      const enablingNotification =
-        (patch.notifySeventy ?? false) ||
-        (patch.notifyNinety ?? false) ||
-        (patch.notifyHundred ?? false) ||
-        (patch.notifyReset ?? false);
-      if (enablingNotification && !(await ensureNotificationPermission())) return;
+      const enabling =
+        patch.notifySeventy || patch.notifyNinety || patch.notifyHundred || patch.notifyReset;
+      if (enabling && !(await ensureNotificationPermission())) return;
       const next = { ...settings, ...patch };
       setSettings(next);
       await saveSettings(next);
     },
     [saveSettings, settings],
   );
+
   const updatePreferences = useCallback(
-    async (patch: Partial<WindowPreferences>) => {
-      const next = { ...preferences, ...patch };
+    (patch: Partial<WindowPreferences>) => {
+      const next = { ...preferencesRef.current, ...patch };
+      preferencesRef.current = next;
       setPreferences(next);
-      await saveWindowPreferences(next);
+      const save = preferenceSaveQueue.current
+        .catch(() => undefined)
+        .then(() => saveWindowPreferences(next))
+        .then((saved) => {
+          if (preferencesRef.current === next) {
+            preferencesRef.current = saved;
+            setPreferences(saved);
+          }
+          return saved;
+        });
+      preferenceSaveQueue.current = save;
+      return save;
     },
-    [preferences, saveWindowPreferences],
+    [saveWindowPreferences],
   );
 
-  const panelStyle = useMemo(
-    () => ({ "--panel-opacity": String(preferences.opacity) }) as React.CSSProperties,
-    [preferences.opacity],
-  );
-  const compact = preferences.mode === "compact";
+  const compact = preferences.mode === "compact" && screen === "meter";
+  const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
+
+  const openSettings = () => {
+    setScreen("settings");
+    void resizeView("settings");
+  };
+  const closeSettings = async () => {
+    await preferenceSaveQueue.current.catch(() => undefined);
+    setScreen("meter");
+    await resizeView(preferencesRef.current.mode);
+  };
+  const toggleWindowMode = () => {
+    const nextMode = preferencesRef.current.mode === "compact" ? "detailed" : "compact";
+    void updatePreferences({ mode: nextMode });
+    void resizeView(nextMode);
+  };
+
+  const drag = (event: React.MouseEvent) => {
+    if (event.button === 0 && !preferences.locked) void dragWindow();
+  };
+
+  if (compact) {
+    return (
+      <main className="app-shell compact-shell">
+        <section className="liquid-panel compact-panel" onMouseDown={drag}>
+          <strong className="brand-word">Codex</strong>
+          {!settings.usageEnabled ? (
+            <button
+              className="compact-state-button"
+              type="button"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => void authorize()}
+            >
+              {t("compactEnable")}
+            </button>
+          ) : view.status === "loading" ? (
+            <span className="compact-state" role="status">
+              {t("compactLoading")}
+            </span>
+          ) : view.status === "error" ? (
+            <button
+              className="compact-state-button risk-text-critical"
+              type="button"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => void refresh()}
+            >
+              {t("compactRetry")}
+            </button>
+          ) : (
+            readyWindows.map((window, index) => {
+              const remaining = remainingPercent(window.usedPercent);
+              return (
+                <span className="compact-metric" key={window.id}>
+                  {index > 0 && <span className="metric-dot">·</span>}
+                  <span className="metric-label">{windowShortLabel(window.id)}</span>
+                  <strong className={`metric-value risk-text-${riskClass(remaining)}`}>
+                    {remaining}%
+                  </strong>
+                </span>
+              );
+            })
+          )}
+          <button
+            className="compact-mode-toggle"
+            type="button"
+            aria-label={t("switchToStandard")}
+            title={t("switchToStandard")}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={toggleWindowMode}
+          >
+            <svg aria-hidden="true" viewBox="0 0 16 16">
+              <path d="M2.5 5.25h8m-2.5-2.5 2.5 2.5-2.5 2.5M13.5 10.75h-8m2.5-2.5-2.5 2.5 2.5 2.5" />
+            </svg>
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   return (
-    <main className={`app-shell ${compact ? "is-compact" : "is-detailed"}`} style={panelStyle}>
-      <section
-        className={`glass-panel glass-${preferences.glassStrength}`}
-        aria-labelledby="app-title"
-      >
-        <header
-          className="drag-region"
-          onMouseDown={(event) => {
-            if (event.button === 0 && !preferences.locked) void dragWindow();
-          }}
-        >
-          <div>
-            <p className="eyebrow">CODEX</p>
-            <h1 id="app-title">{t("appName")}</h1>
-          </div>
-          <div className="header-actions" onMouseDown={(event) => event.stopPropagation()}>
-            <button
-              className="icon-button"
-              disabled={refreshing}
-              onClick={() => void refresh()}
-              type="button"
-            >
-              {refreshing ? "…" : "↻"}
-              <span className="sr-only">{t("refresh")}</span>
-            </button>
-            {!compact && (
-              <button
-                className="icon-button"
-                onClick={() => setShowControls((value) => !value)}
-                type="button"
-              >
-                ⌁<span className="sr-only">{t("windowControls")}</span>
+    <main className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"}`}>
+      <section className="liquid-panel">
+        <header className="titlebar" onMouseDown={drag}>
+          <h1>{screen === "settings" ? t("settingsTitle") : t("meterTitle")}</h1>
+          <div className="title-actions" onMouseDown={(event) => event.stopPropagation()}>
+            {screen === "settings" ? (
+              <button className="text-action" type="button" onClick={() => void closeSettings()}>
+                {t("done")}
               </button>
+            ) : (
+              <>
+                <button
+                  className="text-action"
+                  disabled={refreshing}
+                  onClick={() => void refresh()}
+                  type="button"
+                >
+                  {refreshing ? t("refreshing") : t("refresh")}
+                </button>
+                <button
+                  className="icon-action mode-toggle-action"
+                  type="button"
+                  aria-label={t("switchToCompact")}
+                  title={t("switchToCompact")}
+                  onClick={toggleWindowMode}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 16 16">
+                    <path d="M2.5 5.25h8m-2.5-2.5 2.5 2.5-2.5 2.5M13.5 10.75h-8m2.5-2.5-2.5 2.5 2.5 2.5" />
+                  </svg>
+                </button>
+                <button className="text-action" onClick={openSettings} type="button">
+                  {t("settingsTitle")}
+                </button>
+              </>
             )}
           </div>
         </header>
 
-        {!settings.usageEnabled ? (
-          <div className="onboarding" role="dialog">
-            <strong>{t("privacyTitle")}</strong>
-            <p>{t("privacyBody")}</p>
-            <button
-              type="button"
-              onClick={() =>
-                void ensureNotificationPermission()
-                  .then(() => authorizeUsage())
-                  .then((next) => {
-                    setView(next);
-                    setSettings((value) => ({ ...value, usageEnabled: true }));
-                  })
-              }
-            >
-              {t("enableUsage")}
-            </button>
-          </div>
-        ) : (
-          view.status === "loading" && <p className="status-message">{t("loading")}</p>
-        )}
-        {settings.usageEnabled && view.status === "error" && (
-          <div className="error-state" role="alert">
-            <strong>{t(`errors.${view.code}`, { defaultValue: t("errors.unknown") })}</strong>
-            <button onClick={() => void refresh()} type="button">
-              {t("retry")}
-            </button>
-          </div>
-        )}
-        {settings.usageEnabled && view.status === "ready" && (
-          <>
-            {view.stale && <p className="stale-notice">{t("stale")}</p>}
-            <div className="usage-list">
-              {view.snapshot.windows.map((window) => {
-                const used = Math.round(window.usedPercent);
-                const remaining = Math.max(0, 100 - used);
-                return (
-                  <article className="usage-window" key={window.id}>
-                    <div className="usage-heading">
-                      <span>{t(`windows.${window.id}`, { defaultValue: window.label })}</span>
-                      <strong>{used}%</strong>
-                    </div>
-                    <div
-                      aria-label={t("usedPercent", { value: used })}
-                      aria-valuemax={100}
-                      aria-valuemin={0}
-                      aria-valuenow={used}
-                      className="progress-track"
-                      role="progressbar"
-                    >
-                      <span
-                        className={`progress-fill risk-${used >= 90 ? "critical" : used >= 70 ? "warning" : "healthy"}`}
-                        style={{ width: `${used}%` }}
-                      />
-                    </div>
-                    {!compact && (
-                      <div className="usage-meta">
-                        <span>{t("remaining", { value: remaining })}</span>
-                        {window.resetAt && (
-                          <span>
-                            {t("resets", {
-                              value: new Date(window.resetAt * 1000).toLocaleString(),
-                            })}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {!compact && showControls && (
-          <div className="control-sheet">
-            <label>
-              <span>{t("windowMode")}</span>
-              <select
+        {screen === "settings" ? (
+          <div className="settings-scroll">
+            <SettingsGroup title={t("appearanceGroup")}>
+              <SelectRow
+                label={t("windowMode")}
                 value={preferences.mode}
-                onChange={(event) =>
-                  void updatePreferences({ mode: event.target.value as WindowPreferences["mode"] })
+                onChange={(value) =>
+                  void updatePreferences({ mode: value as WindowPreferences["mode"] })
                 }
-              >
-                <option value="compact">{t("compact")}</option>
-                <option value="detailed">{t("detailed")}</option>
-              </select>
-            </label>
-            <label>
-              <span>{t("glassStrength")}</span>
-              <select
-                value={preferences.glassStrength}
-                onChange={(event) =>
-                  void updatePreferences({
-                    glassStrength: event.target.value as WindowPreferences["glassStrength"],
-                  })
-                }
-              >
-                <option value="clear">{t("clear")}</option>
-                <option value="standard">{t("standard")}</option>
-                <option value="rich">{t("rich")}</option>
-              </select>
-            </label>
-            <label>
-              <span>{t("opacity")}</span>
-              <input
-                min="0.55"
-                max="1"
-                step="0.05"
-                type="range"
-                value={preferences.opacity}
-                onChange={(event) =>
-                  void updatePreferences({ opacity: Number(event.target.value) })
-                }
+                options={[
+                  ["compact", t("compact")],
+                  ["detailed", t("detailed")],
+                ]}
               />
-            </label>
-            <label className="toggle-row">
-              <span>{t("alwaysOnTop")}</span>
-              <input
+              <label className="setting-row glass-level-row">
+                <span>{t("glassEffect")}</span>
+                <span className="glass-level-control">
+                  <input
+                    aria-label={t("glassEffect")}
+                    aria-valuetext={t("glassEffectValue", {
+                      value: Math.round(preferences.glassLevel * 100),
+                    })}
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    type="range"
+                    value={preferences.glassLevel}
+                    onChange={(event) =>
+                      void updatePreferences({ glassLevel: Number(event.target.value) })
+                    }
+                  />
+                  <span className="glass-level-scale" aria-hidden="true">
+                    <span>{t("clear")}</span>
+                    <span>{t("standard")}</span>
+                  </span>
+                </span>
+              </label>
+              <ToggleRow
+                label={t("alwaysOnTop")}
                 checked={preferences.alwaysOnTop}
-                type="checkbox"
-                onChange={(event) => void updatePreferences({ alwaysOnTop: event.target.checked })}
+                onChange={(checked) => void updatePreferences({ alwaysOnTop: checked })}
               />
-            </label>
-            <label className="toggle-row">
-              <span>{t("lockPosition")}</span>
-              <input
+              <ToggleRow
+                label={t("lockPosition")}
                 checked={preferences.locked}
-                type="checkbox"
-                onChange={(event) => void updatePreferences({ locked: event.target.checked })}
+                onChange={(checked) => void updatePreferences({ locked: checked })}
               />
-            </label>
-            <label className="toggle-row">
-              <span>{t("clickThrough")}</span>
-              <input
+              <ToggleRow
+                label={t("clickThrough")}
                 checked={preferences.clickThrough}
-                type="checkbox"
-                onChange={(event) => void updatePreferences({ clickThrough: event.target.checked })}
+                onChange={(checked) => void updatePreferences({ clickThrough: checked })}
               />
-            </label>
-            <label>
-              <span>{t("refreshInterval")}</span>
-              <select
-                onChange={(event) => void updateInterval(Number(event.target.value))}
-                value={settings.intervalMinutes}
-              >
-                {[1, 5, 10, 15, 30, 60].map((minutes) => (
-                  <option key={minutes} value={minutes}>
-                    {t("minutes", { count: minutes })}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="toggle-row">
-              <span>{t("notify70")}</span>
-              <input
+            </SettingsGroup>
+            <SettingsGroup title={t("dataGroup")}>
+              <SelectRow
+                label={t("refreshInterval")}
+                value={String(settings.intervalMinutes)}
+                onChange={(value) => {
+                  const minutes = Number(value);
+                  setSettings((current) => ({ ...current, intervalMinutes: minutes }));
+                  void saveInterval(minutes);
+                }}
+                options={[1, 5, 10, 15, 30, 60].map((minutes) => [
+                  String(minutes),
+                  t("minutes", { count: minutes }),
+                ])}
+              />
+            </SettingsGroup>
+            <SettingsGroup title={t("notificationsGroup")}>
+              <ToggleRow
+                label={t("notify70")}
                 checked={settings.notifySeventy}
-                type="checkbox"
-                onChange={(e) => void updateSettings({ notifySeventy: e.target.checked })}
+                onChange={(checked) => void updateSettings({ notifySeventy: checked })}
               />
-            </label>
-            <label className="toggle-row">
-              <span>{t("notify90")}</span>
-              <input
+              <ToggleRow
+                label={t("notify90")}
                 checked={settings.notifyNinety}
-                type="checkbox"
-                onChange={(e) => void updateSettings({ notifyNinety: e.target.checked })}
+                onChange={(checked) => void updateSettings({ notifyNinety: checked })}
               />
-            </label>
-            <label className="toggle-row">
-              <span>{t("notify100")}</span>
-              <input
+              <ToggleRow
+                label={t("notify100")}
                 checked={settings.notifyHundred}
-                type="checkbox"
-                onChange={(e) => void updateSettings({ notifyHundred: e.target.checked })}
+                onChange={(checked) => void updateSettings({ notifyHundred: checked })}
               />
-            </label>
-            <label className="toggle-row">
-              <span>{t("notifyReset")}</span>
-              <input
+              <ToggleRow
+                label={t("notifyReset")}
                 checked={settings.notifyReset}
-                type="checkbox"
-                onChange={(e) => void updateSettings({ notifyReset: e.target.checked })}
+                onChange={(checked) => void updateSettings({ notifyReset: checked })}
               />
-            </label>
-            <label className="toggle-row">
-              <span>{t("launchAtLogin")}</span>
-              <input
+            </SettingsGroup>
+            <SettingsGroup title={t("systemGroup")}>
+              <ToggleRow
+                label={t("launchAtLogin")}
                 checked={autostart}
-                type="checkbox"
-                onChange={(e) => {
-                  setAutostartValue(e.target.checked);
-                  void saveAutostart(e.target.checked);
+                onChange={(checked) => {
+                  setAutostartValue(checked);
+                  void saveAutostart(checked);
                 }}
               />
-            </label>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => void exportDiagnosticReport()}
-            >
-              {t("diagnostics")}
-            </button>
-            <button
-              className="language-button"
-              onClick={() => void i18n.changeLanguage(i18n.language === "zh" ? "en" : "zh")}
-              type="button"
-            >
-              {i18n.language === "zh" ? "English" : "中文"}
-            </button>
+              <button
+                className="setting-row row-button"
+                type="button"
+                onClick={() => void i18n.changeLanguage(i18n.language === "zh" ? "en" : "zh")}
+              >
+                <span>{t("language")}</span>
+                <span className="row-value">{i18n.language === "zh" ? "简体中文" : "English"}</span>
+              </button>
+            </SettingsGroup>
+            <div className="about-meta">
+              <span>
+                {t("appName")} v{appVersion.split(".").slice(0, 2).join(".")}
+              </span>
+              <span>{t("author", { value: "Eric Zhang" })}</span>
+            </div>
           </div>
+        ) : (
+          <MeterContent
+            view={view}
+            usageEnabled={settings.usageEnabled}
+            stale={view.status === "ready" && view.stale}
+            intervalMinutes={settings.intervalMinutes}
+            locale={i18n.language}
+            onRefresh={refresh}
+            onAuthorize={authorize}
+            t={t}
+          />
         )}
-        <footer>{compact ? t("compactHint") : t("phaseThree")}</footer>
       </section>
     </main>
+  );
+}
+
+function MeterContent({
+  view,
+  usageEnabled,
+  stale,
+  intervalMinutes,
+  locale,
+  onRefresh,
+  onAuthorize,
+  t,
+}: {
+  view: UsageView;
+  usageEnabled: boolean;
+  stale: boolean;
+  intervalMinutes: number;
+  locale: string;
+  onRefresh: () => Promise<void>;
+  onAuthorize: () => Promise<void>;
+  t: ReturnType<typeof useTranslation>["t"];
+}) {
+  if (!usageEnabled)
+    return (
+      <div className="state-card">
+        <strong>{t("privacyTitle")}</strong>
+        <p>{t("privacyBody")}</p>
+        <button type="button" onClick={() => void onAuthorize()}>
+          {t("enableUsage")}
+        </button>
+      </div>
+    );
+  if (view.status === "loading") return <p className="status-message">{t("loading")}</p>;
+  if (view.status === "error")
+    return (
+      <div className="state-card error-state" role="alert">
+        <strong>{t(`errors.${view.code}`, { defaultValue: t("errors.unknown") })}</strong>
+        <button type="button" onClick={() => void onRefresh()}>
+          {t("retry")}
+        </button>
+      </div>
+    );
+  return (
+    <div className="meter-content">
+      {stale && <p className="stale-notice">{t("stale")}</p>}
+      <div className="usage-list">
+        {view.snapshot.windows.map((window) => {
+          const used = Math.round(window.usedPercent);
+          const remaining = remainingPercent(window.usedPercent);
+          return (
+            <article className="usage-window" key={window.id}>
+              <div className="usage-heading">
+                <strong>{t(`windows.${window.id}`, { defaultValue: window.label })}</strong>
+                <strong className={`risk-text-${riskClass(remaining)}`}>{remaining}%</strong>
+              </div>
+              <div
+                aria-label={t("remainingPercent", { value: remaining })}
+                aria-valuemax={100}
+                aria-valuemin={0}
+                aria-valuenow={remaining}
+                className={`progress-track risk-track-${riskClass(remaining)}`}
+                role="progressbar"
+              >
+                <span
+                  className={`progress-fill risk-fill-${riskClass(remaining)}`}
+                  style={{ width: `${remaining}%` }}
+                />
+              </div>
+              <div className="usage-meta">
+                <span>{t("used", { value: used })}</span>
+                {window.resetAt && (
+                  <span>
+                    {t("resetsShort", {
+                      value: new Date(window.resetAt * 1000).toLocaleString([], {
+                        weekday: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      }),
+                    })}
+                  </span>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <footer>
+        {t("updatedAt", {
+          value: new Intl.DateTimeFormat(locale, {
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(new Date(view.snapshot.queriedAt)),
+        })}
+        <span>·</span>
+        {t("autoRefresh", { value: intervalMinutes })}
+      </footer>
+    </div>
+  );
+}
+
+function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="settings-group">
+      <h2>{title}</h2>
+      <div className="settings-card">{children}</div>
+    </section>
+  );
+}
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="setting-row">
+      <span>{label}</span>
+      <input checked={checked} type="checkbox" onChange={(e) => onChange(e.target.checked)} />
+    </label>
+  );
+}
+function SelectRow({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[][];
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="setting-row">
+      <span>{label}</span>
+      <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map(([optionValue, text]) => (
+          <option value={optionValue} key={optionValue}>
+            {text}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
