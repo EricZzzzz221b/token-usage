@@ -30,6 +30,7 @@ const defaults = {
   loadSettings: vi.fn().mockResolvedValue({
     intervalMinutes: 5,
     usageEnabled: true,
+    trayWindow: "five_hour" as const,
     notifySeventy: false,
     notifyNinety: true,
     notifyHundred: true,
@@ -38,6 +39,7 @@ const defaults = {
   saveInterval: vi.fn().mockResolvedValue({
     intervalMinutes: 5,
     usageEnabled: true,
+    trayWindow: "five_hour" as const,
     notifySeventy: false,
     notifyNinety: true,
     notifyHundred: true,
@@ -202,6 +204,7 @@ describe("App", () => {
         loadSettings={vi.fn().mockResolvedValue({
           intervalMinutes: 10,
           usageEnabled: true,
+          trayWindow: "seven_day" as const,
           notifySeventy: false,
           notifyNinety: true,
           notifyHundred: true,
@@ -214,6 +217,14 @@ describe("App", () => {
     const glassEffect = screen.getByLabelText(/玻璃效果|Glass effect/) as HTMLInputElement;
     expect(glassEffect.type).toBe("range");
     expect(glassEffect.value).toBe("0.5");
+    const trayWindow = screen.getByLabelText(/状态栏显示周期|Menu bar window/);
+    expect(trayWindow).toHaveValue("seven_day");
+    fireEvent.change(trayWindow, { target: { value: "five_hour" } });
+    await waitFor(() =>
+      expect(defaults.saveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ trayWindow: "five_hour" }),
+      ),
+    );
     expect(screen.queryByText(/诊断报告|Diagnostics/)).not.toBeInTheDocument();
     expect(screen.getByText(/Token用量 v1\.1|Token Usage v1\.1/)).toBeInTheDocument();
     expect(screen.getByText(/Eric Zhang/)).toBeInTheDocument();

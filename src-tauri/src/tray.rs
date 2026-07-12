@@ -5,7 +5,7 @@ use tauri::{
     App, AppHandle, Emitter, Manager,
 };
 
-use crate::refresh::{RefreshCoordinator, UsageView};
+use crate::refresh::{RefreshCoordinator, TrayWindow, UsageView};
 
 const TRAY_ID: &str = "token-usage";
 const SUMMARY_ID: &str = "usage-summary";
@@ -61,11 +61,11 @@ pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()
     Ok(())
 }
 
-pub fn update(app: &AppHandle, view: &UsageView) {
+pub fn update(app: &AppHandle, view: &UsageView, tray_window: TrayWindow) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return;
     };
-    let (title, tooltip, summary) = tray_text(view);
+    let (title, tooltip, summary) = tray_text(view, tray_window);
     let _ = tray.set_title(Some(title));
     let _ = tray.set_tooltip(Some(tooltip));
     if let Ok(menu) = build_menu(app, &summary) {
@@ -106,7 +106,7 @@ fn show_window(app: &AppHandle) {
     }
 }
 
-fn tray_text(view: &UsageView) -> (String, String, String) {
+fn tray_text(view: &UsageView, tray_window: TrayWindow) -> (String, String, String) {
     match view {
         UsageView::Loading => (
             "--%".into(),
@@ -121,11 +121,16 @@ fn tray_text(view: &UsageView) -> (String, String, String) {
         UsageView::Ready {
             snapshot, stale, ..
         } => {
+            let selected_id = match tray_window {
+                TrayWindow::FiveHour => "five_hour",
+                TrayWindow::SevenDay => "seven_day",
+            };
             let remaining = snapshot
                 .windows
                 .iter()
+                .find(|window| window.id == selected_id)
+                .or_else(|| snapshot.windows.first())
                 .map(|window| (100.0 - window.used_percent).clamp(0.0, 100.0).round() as i64)
-                .min()
                 .unwrap_or(100);
             let title = if *stale {
                 format!("~{remaining}%")
@@ -152,7 +157,7 @@ mod tests {
     use crate::model::{UsageSnapshot, UsageWindow};
 
     #[test]
-    fn lowest_remaining_window_drives_tray_title() {
+    fn selected_window_drives_tray_title() {
         let view = UsageView::Ready {
             snapshot: UsageSnapshot {
                 source: "codex_oauth".into(),
@@ -177,6 +182,7 @@ mod tests {
             stale: false,
             last_error: None,
         };
-        assert_eq!(tray_text(&view).0, "32%");
+        assert_eq!(tray_text(&view, TrayWindow::FiveHour).0, "58%");
+        assert_eq!(tray_text(&view, TrayWindow::SevenDay).0, "32%");
     }
 }

@@ -12,12 +12,22 @@ const MIN_INTERVAL_MINUTES: u64 = 1;
 const MAX_INTERVAL_MINUTES: u64 = 1_440;
 const LAST_GOOD_GRACE_MILLIS: i64 = 30 * 60 * 1_000;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrayWindow {
+    #[default]
+    FiveHour,
+    SevenDay,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RefreshSettings {
     pub interval_minutes: u64,
     #[serde(default)]
     pub usage_enabled: bool,
+    #[serde(default)]
+    pub tray_window: TrayWindow,
     #[serde(default)]
     pub notify_seventy: bool,
     #[serde(default = "default_true")]
@@ -33,6 +43,7 @@ impl Default for RefreshSettings {
         Self {
             interval_minutes: DEFAULT_INTERVAL_MINUTES,
             usage_enabled: false,
+            tray_window: TrayWindow::FiveHour,
             notify_seventy: false,
             notify_ninety: true,
             notify_hundred: true,
@@ -214,7 +225,7 @@ impl RefreshCoordinator {
             view_from_state(&state, now_millis())
         };
         let _ = app.emit("usage://updated", &view);
-        tray::update(app, &view);
+        tray::update(app, &view, self.settings().await.tray_window);
         view
     }
 }
@@ -335,6 +346,23 @@ mod tests {
             interval_minutes: 1_441,
             ..RefreshSettings::default()
         }));
+    }
+
+    #[test]
+    fn defaults_existing_settings_to_five_hour_tray_window() {
+        let settings: RefreshSettings = serde_json::from_str(
+            r#"{
+                "intervalMinutes": 5,
+                "usageEnabled": true,
+                "notifySeventy": false,
+                "notifyNinety": true,
+                "notifyHundred": true,
+                "notifyReset": false
+            }"#,
+        )
+        .expect("legacy settings should remain readable");
+
+        assert_eq!(settings.tray_window, TrayWindow::FiveHour);
     }
 
     #[test]
