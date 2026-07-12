@@ -195,10 +195,7 @@ fn set_glass_strength(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let window_state = tauri_plugin_window_state::Builder::default()
-        .with_state_flags(
-            tauri_plugin_window_state::StateFlags::POSITION
-                | tauri_plugin_window_state::StateFlags::SIZE,
-        )
+        .with_state_flags(tauri_plugin_window_state::StateFlags::POSITION)
         .build();
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())

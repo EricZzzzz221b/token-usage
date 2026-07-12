@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   getRefreshSettings,
@@ -19,6 +19,7 @@ import {
 } from "./system";
 import {
   getWindowPreferences,
+  onWindowModeChanged,
   onWindowPreferences,
   resizeWindowForView,
   setWindowPreferences,
@@ -46,6 +47,9 @@ interface AppProps {
   saveWindowPreferences?: (preferences: WindowPreferences) => Promise<WindowPreferences>;
   dragWindow?: () => Promise<void>;
   subscribeWindowPreferences?: (
+    handler: (preferences: WindowPreferences) => void,
+  ) => Promise<() => void>;
+  subscribeWindowModeChanged?: (
     handler: (preferences: WindowPreferences) => void,
   ) => Promise<() => void>;
   loadAutostart?: () => Promise<boolean>;
@@ -79,6 +83,7 @@ export default function App({
   saveWindowPreferences = setWindowPreferences,
   dragWindow = startWindowDrag,
   subscribeWindowPreferences = onWindowPreferences,
+  subscribeWindowModeChanged = onWindowModeChanged,
   loadAutostart = getAutostart,
   saveAutostart = setAutostart,
   authorizeUsage = enableUsage,
@@ -98,23 +103,36 @@ export default function App({
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
+  const preferencesRef = useRef(defaultWindowPreferences);
+  const preferenceSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
 
   useEffect(() => {
     void loadUsage().then(setView);
     void loadSettings().then(setSettings);
     void loadAutostart().then(setAutostartValue);
-    void loadWindowPreferences().then(setPreferences);
+    void loadWindowPreferences().then((next) => {
+      preferencesRef.current = next;
+      setPreferences(next);
+    });
     let active = true;
     let unlisten: (() => void) | undefined;
     let unlistenWindow: (() => void) | undefined;
+    let unlistenMode: (() => void) | undefined;
     void subscribe(setView).then((cleanup) => (active ? (unlisten = cleanup) : cleanup()));
-    void subscribeWindowPreferences(setPreferences).then((cleanup) =>
-      active ? (unlistenWindow = cleanup) : cleanup(),
-    );
+    void subscribeWindowPreferences((next) => {
+      preferencesRef.current = next;
+      setPreferences(next);
+    }).then((cleanup) => (active ? (unlistenWindow = cleanup) : cleanup()));
+    void subscribeWindowModeChanged((next) => {
+      preferencesRef.current = next;
+      setPreferences(next);
+      setScreen("meter");
+    }).then((cleanup) => (active ? (unlistenMode = cleanup) : cleanup()));
     return () => {
       active = false;
       unlisten?.();
       unlistenWindow?.();
+      unlistenMode?.();
     };
   }, [
     loadAutostart,
@@ -123,6 +141,7 @@ export default function App({
     loadWindowPreferences,
     subscribe,
     subscribeWindowPreferences,
+    subscribeWindowModeChanged,
   ]);
 
   const refresh = useCallback(async () => {
@@ -133,6 +152,12 @@ export default function App({
       setRefreshing(false);
     }
   }, [reloadUsage]);
+
+  const authorize = useCallback(async () => {
+    const next = await authorizeUsage();
+    setView(next);
+    setSettings((current) => ({ ...current, usageEnabled: true }));
+  }, [authorizeUsage]);
 
   const updateSettings = useCallback(
     async (patch: Partial<RefreshSettings>) => {
@@ -147,68 +172,98 @@ export default function App({
   );
 
   const updatePreferences = useCallback(
-    async (patch: Partial<WindowPreferences>) => {
-      const next = { ...preferences, ...patch };
+    (patch: Partial<WindowPreferences>) => {
+      const next = { ...preferencesRef.current, ...patch };
+      preferencesRef.current = next;
       setPreferences(next);
-      await saveWindowPreferences(next);
+      const save = preferenceSaveQueue.current
+        .catch(() => undefined)
+        .then(() => saveWindowPreferences(next))
+        .then((saved) => {
+          if (preferencesRef.current === next) {
+            preferencesRef.current = saved;
+            setPreferences(saved);
+          }
+          return saved;
+        });
+      preferenceSaveQueue.current = save;
+      return save;
     },
-    [preferences, saveWindowPreferences],
+    [saveWindowPreferences],
   );
 
   const compact = preferences.mode === "compact" && screen === "meter";
-  const panelStyle = useMemo(
-    () => ({ "--panel-opacity": String(preferences.opacity) }) as React.CSSProperties,
-    [preferences.opacity],
-  );
   const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
 
   const openSettings = () => {
     setScreen("settings");
     void resizeView("settings");
   };
-  const closeSettings = () => {
+  const closeSettings = async () => {
+    await preferenceSaveQueue.current.catch(() => undefined);
     setScreen("meter");
-    void resizeView(preferences.mode);
+    await resizeView(preferencesRef.current.mode);
   };
 
   const drag = (event: React.MouseEvent) => {
     if (event.button === 0 && !preferences.locked) void dragWindow();
   };
 
-  if (compact && settings.usageEnabled && view.status === "ready") {
+  if (compact) {
     return (
-      <main className="app-shell compact-shell" style={panelStyle}>
+      <main className="app-shell compact-shell">
         <section
           className={`liquid-panel compact-panel glass-${preferences.glassStrength}`}
           onMouseDown={drag}
         >
           <strong className="brand-word">Codex</strong>
-          {readyWindows.map((window, index) => {
-            const used = Math.round(window.usedPercent);
-            return (
-              <span className="compact-metric" key={window.id}>
-                {index > 0 && <span className="metric-dot">·</span>}
-                <span className="metric-label">{windowShortLabel(window.id)}</span>
-                <strong className={`metric-value risk-text-${riskClass(used)}`}>{used}%</strong>
-              </span>
-            );
-          })}
+          {!settings.usageEnabled ? (
+            <button
+              className="compact-state-button"
+              type="button"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => void authorize()}
+            >
+              {t("compactEnable")}
+            </button>
+          ) : view.status === "loading" ? (
+            <span className="compact-state" role="status">
+              {t("compactLoading")}
+            </span>
+          ) : view.status === "error" ? (
+            <button
+              className="compact-state-button risk-text-critical"
+              type="button"
+              onMouseDown={(event) => event.stopPropagation()}
+              onClick={() => void refresh()}
+            >
+              {t("compactRetry")}
+            </button>
+          ) : (
+            readyWindows.map((window, index) => {
+              const used = Math.round(window.usedPercent);
+              return (
+                <span className="compact-metric" key={window.id}>
+                  {index > 0 && <span className="metric-dot">·</span>}
+                  <span className="metric-label">{windowShortLabel(window.id)}</span>
+                  <strong className={`metric-value risk-text-${riskClass(used)}`}>{used}%</strong>
+                </span>
+              );
+            })
+          )}
         </section>
       </main>
     );
   }
 
   return (
-    <main
-      className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"}`}
-      style={panelStyle}
-    >
+    <main className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"}`}>
       <section className={`liquid-panel glass-${preferences.glassStrength}`}>
         <header className="titlebar" onMouseDown={drag}>
           <h1>{screen === "settings" ? t("settingsTitle") : t("meterTitle")}</h1>
           <div className="title-actions" onMouseDown={(event) => event.stopPropagation()}>
             {screen === "settings" ? (
-              <button className="text-action" type="button" onClick={closeSettings}>
+              <button className="text-action" type="button" onClick={() => void closeSettings()}>
                 {t("done")}
               </button>
             ) : (
@@ -353,12 +408,10 @@ export default function App({
             view={view}
             usageEnabled={settings.usageEnabled}
             stale={view.status === "ready" && view.stale}
+            intervalMinutes={settings.intervalMinutes}
+            locale={i18n.language}
             onRefresh={refresh}
-            onAuthorize={async () => {
-              const next = await authorizeUsage();
-              setView(next);
-              setSettings((current) => ({ ...current, usageEnabled: true }));
-            }}
+            onAuthorize={authorize}
             t={t}
           />
         )}
@@ -371,6 +424,8 @@ function MeterContent({
   view,
   usageEnabled,
   stale,
+  intervalMinutes,
+  locale,
   onRefresh,
   onAuthorize,
   t,
@@ -378,6 +433,8 @@ function MeterContent({
   view: UsageView;
   usageEnabled: boolean;
   stale: boolean;
+  intervalMinutes: number;
+  locale: string;
   onRefresh: () => Promise<void>;
   onAuthorize: () => Promise<void>;
   t: ReturnType<typeof useTranslation>["t"];
@@ -447,9 +504,14 @@ function MeterContent({
         })}
       </div>
       <footer>
-        {t("updatedNow")}
+        {t("updatedAt", {
+          value: new Intl.DateTimeFormat(locale, {
+            hour: "2-digit",
+            minute: "2-digit",
+          }).format(new Date(view.snapshot.queriedAt)),
+        })}
         <span>·</span>
-        {t("autoRefresh", { value: 5 })}
+        {t("autoRefresh", { value: intervalMinutes })}
       </footer>
     </div>
   );

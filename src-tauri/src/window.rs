@@ -38,7 +38,7 @@ impl Default for WindowPreferences {
             always_on_top: true,
             locked: false,
             click_through: false,
-            opacity: 0.86,
+            opacity: 0.75,
             glass_strength: GlassStrength::Standard,
         }
     }
@@ -144,6 +144,11 @@ fn apply_glass_with_radius(
                 corner_radius: f64,
                 opacity: f64,
             ) -> bool;
+            fn token_usage_apply_fallback_tint(
+                view_pointer: *mut std::ffi::c_void,
+                style: i32,
+                opacity: f64,
+            );
         }
 
         use window_vibrancy::{
@@ -172,6 +177,7 @@ fn apply_glass_with_radius(
             Some(radius),
         )
         .map_err(|_| UsageError::WindowUnavailable)?;
+        unsafe { token_usage_apply_fallback_tint(ns_view, style, opacity) };
     }
     Ok(())
 }

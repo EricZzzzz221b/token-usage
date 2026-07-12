@@ -1,5 +1,6 @@
 :root {
   color: #17212b;
+  color-scheme: light dark;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -25,7 +26,6 @@ button {
   color: inherit;
 }
 .app-shell {
-  --panel-opacity: 0.75;
   width: 100%;
   height: 100%;
   padding: 0;
@@ -35,8 +35,8 @@ button {
   position: relative;
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  border-radius: 22px;
+  overflow: visible;
+  border-radius: 0;
   border: 0;
   outline: 0;
   background: transparent;
@@ -53,7 +53,6 @@ button {
   justify-content: center;
   gap: 13px;
   padding: 0 19px;
-  border-radius: 17px;
   cursor: grab;
   user-select: none;
   white-space: nowrap;
@@ -79,6 +78,29 @@ button {
 .metric-value {
   font-size: 13px;
   font-weight: 650;
+}
+.compact-state,
+.compact-state-button {
+  color: rgba(28, 39, 51, 0.62);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.compact-state-button {
+  min-height: 30px;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.compact-state-button:focus-visible,
+.text-action:focus-visible,
+.row-button:focus-visible,
+.state-card button:focus-visible,
+.setting-row select:focus-visible,
+.setting-row input:focus-visible {
+  outline: 2px solid #2875aa;
+  outline-offset: 2px;
 }
 .titlebar {
   position: relative;
@@ -226,9 +248,6 @@ footer {
   background: #2875aa;
   cursor: pointer;
 }
-.settings-shell .liquid-panel {
-  border-radius: 24px;
-}
 .settings-scroll {
   position: relative;
   z-index: 1;
@@ -251,7 +270,7 @@ footer {
   overflow: hidden;
   border-radius: 14px;
   background: rgba(245, 248, 252, 0.26);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: none;
 }
 .setting-row {
   width: 100%;
@@ -277,7 +296,6 @@ footer {
   color: #2875aa;
   background: transparent;
   text-align: right;
-  outline: none;
   cursor: pointer;
 }
 .setting-row input[type="range"] {
@@ -300,15 +318,15 @@ footer {
   :root {
     color: #f1f4f7;
   }
-  .liquid-panel {
+  .liquid-panel,
+  .glass-clear {
     background-color: transparent;
     box-shadow: none;
   }
-  .glass-clear {
-    background-color: transparent;
-  }
   .metric-label,
   .metric-dot,
+  .compact-state,
+  .compact-state-button,
   .usage-meta,
   footer,
   .settings-group h2,

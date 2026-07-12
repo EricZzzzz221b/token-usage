@@ -46,6 +46,7 @@ pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()
                 let _ = crate::window::resize_for_view(app, view);
                 let _ = crate::window::save_preferences(app, &preferences);
                 let _ = app.emit("window://preferences", &preferences);
+                let _ = app.emit("window://mode-changed", &preferences);
                 show_window(app);
             }
             INTERACTION_ID => crate::window::disable_click_through(app),

@@ -34,3 +34,9 @@ export function onWindowPreferences(
 ): Promise<UnlistenFn> {
   return listen<WindowPreferences>("window://preferences", (event) => handler(event.payload));
 }
+
+export function onWindowModeChanged(
+  handler: (preferences: WindowPreferences) => void,
+): Promise<UnlistenFn> {
+  return listen<WindowPreferences>("window://mode-changed", (event) => handler(event.payload));
+}
