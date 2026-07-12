@@ -10,7 +10,7 @@ use credentials::CredentialReport;
 use error::UsageErrorPayload;
 use refresh::{RefreshCoordinator, RefreshSettings, UsageView};
 use tauri::{Manager, State};
-use window::{GlassStrength, WindowPreferences};
+use window::WindowPreferences;
 
 #[tauri::command]
 fn credential_status() -> CredentialReport {
@@ -183,15 +183,6 @@ fn resize_window_for_view(app: tauri::AppHandle, view: String) -> Result<(), Usa
     window::resize_for_view(&app, &view).map_err(UsageErrorPayload::from)
 }
 
-#[tauri::command]
-fn set_glass_strength(
-    app: tauri::AppHandle,
-    strength: GlassStrength,
-) -> Result<(), UsageErrorPayload> {
-    let opacity = window::load_preferences(&app).opacity;
-    window::apply_glass(&app, strength, opacity).map_err(UsageErrorPayload::from)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let window_state = tauri_plugin_window_state::Builder::default()
@@ -199,7 +190,6 @@ pub fn run() {
         .build();
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .app_name("Token用量")
@@ -246,8 +236,7 @@ pub fn run() {
             get_window_preferences,
             set_window_preferences,
             start_window_drag,
-            resize_window_for_view,
-            set_glass_strength
+            resize_window_for_view
         ])
         .run(tauri::generate_context!())
         .expect("error while running Token Usage");

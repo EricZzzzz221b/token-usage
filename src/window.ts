@@ -2,15 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type WindowMode = "compact" | "detailed";
-export type GlassStrength = "clear" | "standard";
-
 export interface WindowPreferences {
   mode: WindowMode;
   alwaysOnTop: boolean;
   locked: boolean;
   clickThrough: boolean;
-  opacity: number;
-  glassStrength: GlassStrength;
+  glassLevel: number;
 }
 
 export function getWindowPreferences(): Promise<WindowPreferences> {

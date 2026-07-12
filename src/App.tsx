@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
 import {
   getRefreshSettings,
@@ -10,13 +11,7 @@ import {
   type RefreshSettings,
   type UsageView,
 } from "./usage";
-import {
-  enableUsage,
-  ensureNotificationPermission,
-  exportDiagnosticReport,
-  getAutostart,
-  setAutostart,
-} from "./system";
+import { enableUsage, ensureNotificationPermission, getAutostart, setAutostart } from "./system";
 import {
   getWindowPreferences,
   onWindowModeChanged,
@@ -32,8 +27,7 @@ const defaultWindowPreferences: WindowPreferences = {
   alwaysOnTop: true,
   locked: false,
   clickThrough: false,
-  opacity: 0.75,
-  glassStrength: "standard",
+  glassLevel: 0.5,
 };
 
 interface AppProps {
@@ -54,6 +48,7 @@ interface AppProps {
   ) => Promise<() => void>;
   loadAutostart?: () => Promise<boolean>;
   saveAutostart?: (enabled: boolean) => Promise<boolean>;
+  loadAppVersion?: () => Promise<string>;
   authorizeUsage?: () => Promise<UsageView>;
   resizeView?: (view: "compact" | "detailed" | "settings") => Promise<void>;
 }
@@ -86,6 +81,7 @@ export default function App({
   subscribeWindowModeChanged = onWindowModeChanged,
   loadAutostart = getAutostart,
   saveAutostart = setAutostart,
+  loadAppVersion = getVersion,
   authorizeUsage = enableUsage,
   resizeView = resizeWindowForView,
 }: AppProps) {
@@ -100,6 +96,7 @@ export default function App({
     notifyReset: false,
   });
   const [autostart, setAutostartValue] = useState(false);
+  const [appVersion, setAppVersion] = useState("1.0.0");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
@@ -110,6 +107,7 @@ export default function App({
     void loadUsage().then(setView);
     void loadSettings().then(setSettings);
     void loadAutostart().then(setAutostartValue);
+    void loadAppVersion().then(setAppVersion);
     void loadWindowPreferences().then((next) => {
       preferencesRef.current = next;
       setPreferences(next);
@@ -136,6 +134,7 @@ export default function App({
     };
   }, [
     loadAutostart,
+    loadAppVersion,
     loadSettings,
     loadUsage,
     loadWindowPreferences,
@@ -212,10 +211,7 @@ export default function App({
   if (compact) {
     return (
       <main className="app-shell compact-shell">
-        <section
-          className={`liquid-panel compact-panel glass-${preferences.glassStrength}`}
-          onMouseDown={drag}
-        >
+        <section className="liquid-panel compact-panel" onMouseDown={drag}>
           <strong className="brand-word">Codex</strong>
           {!settings.usageEnabled ? (
             <button
@@ -258,7 +254,7 @@ export default function App({
 
   return (
     <main className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"}`}>
-      <section className={`liquid-panel glass-${preferences.glassStrength}`}>
+      <section className="liquid-panel">
         <header className="titlebar" onMouseDown={drag}>
           <h1>{screen === "settings" ? t("settingsTitle") : t("meterTitle")}</h1>
           <div className="title-actions" onMouseDown={(event) => event.stopPropagation()}>
@@ -298,30 +294,28 @@ export default function App({
                   ["detailed", t("detailed")],
                 ]}
               />
-              <SelectRow
-                label={t("glassStrength")}
-                value={preferences.glassStrength}
-                onChange={(value) =>
-                  void updatePreferences({
-                    glassStrength: value as WindowPreferences["glassStrength"],
-                  })
-                }
-                options={[
-                  ["clear", t("clear")],
-                  ["standard", t("standard")],
-                ]}
-              />
-              <label className="setting-row">
-                <span>{t("opacity")}</span>
-                <input
-                  aria-label={t("opacity")}
-                  min="0.55"
-                  max="1"
-                  step="0.05"
-                  type="range"
-                  value={preferences.opacity}
-                  onChange={(e) => void updatePreferences({ opacity: Number(e.target.value) })}
-                />
+              <label className="setting-row glass-level-row">
+                <span>{t("glassEffect")}</span>
+                <span className="glass-level-control">
+                  <input
+                    aria-label={t("glassEffect")}
+                    aria-valuetext={t("glassEffectValue", {
+                      value: Math.round(preferences.glassLevel * 100),
+                    })}
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    type="range"
+                    value={preferences.glassLevel}
+                    onChange={(event) =>
+                      void updatePreferences({ glassLevel: Number(event.target.value) })
+                    }
+                  />
+                  <span className="glass-level-scale" aria-hidden="true">
+                    <span>{t("clear")}</span>
+                    <span>{t("standard")}</span>
+                  </span>
+                </span>
               </label>
               <ToggleRow
                 label={t("alwaysOnTop")}
@@ -393,15 +387,13 @@ export default function App({
                 <span>{t("language")}</span>
                 <span className="row-value">{i18n.language === "zh" ? "简体中文" : "English"}</span>
               </button>
-              <button
-                className="setting-row row-button"
-                type="button"
-                onClick={() => void exportDiagnosticReport()}
-              >
-                <span>{t("diagnostics")}</span>
-                <span className="row-value">{t("export")}</span>
-              </button>
             </SettingsGroup>
+            <div className="about-meta">
+              <span>
+                {t("appName")} v{appVersion.split(".").slice(0, 2).join(".")}
+              </span>
+              <span>{t("author", { value: "Eric Zhang" })}</span>
+            </div>
           </div>
         ) : (
           <MeterContent

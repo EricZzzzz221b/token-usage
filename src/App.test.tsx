@@ -22,8 +22,7 @@ const windowPreferences = {
   alwaysOnTop: true,
   locked: false,
   clickThrough: false,
-  opacity: 0.86,
-  glassStrength: "standard" as const,
+  glassLevel: 0.5,
 };
 const defaults = {
   loadUsage: vi.fn().mockResolvedValue(ready),
@@ -47,6 +46,7 @@ const defaults = {
   saveSettings: vi.fn(),
   loadAutostart: vi.fn().mockResolvedValue(false),
   saveAutostart: vi.fn(),
+  loadAppVersion: vi.fn().mockResolvedValue("1.0.0"),
   authorizeUsage: vi.fn().mockResolvedValue(ready),
   subscribe: vi.fn().mockResolvedValue(vi.fn()),
   loadWindowPreferences: vi.fn().mockResolvedValue(windowPreferences),
@@ -126,7 +126,7 @@ describe("App", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
-  it("shows the configured refresh interval and two native glass styles", async () => {
+  it("shows the configured refresh interval and one continuous glass control", async () => {
     render(
       <App
         {...defaults}
@@ -142,8 +142,12 @@ describe("App", () => {
     );
     expect(await screen.findByText(/自动刷新 10 分钟|Refreshes every 10 min/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
-    const glassStyle = screen.getByLabelText(/玻璃样式|Glass style/) as HTMLSelectElement;
-    expect(glassStyle.options).toHaveLength(2);
+    const glassEffect = screen.getByLabelText(/玻璃效果|Glass effect/) as HTMLInputElement;
+    expect(glassEffect.type).toBe("range");
+    expect(glassEffect.value).toBe("0.5");
+    expect(screen.queryByText(/诊断报告|Diagnostics/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Token用量 v1\.0|Token Usage v1\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/Eric Zhang/)).toBeInTheDocument();
   });
 
   it("keeps settings open for preference-only tray events", async () => {
@@ -174,7 +178,7 @@ describe("App", () => {
     expect(screen.getByText("Codex")).toBeInTheDocument();
   });
 
-  it("serializes rapid glass tint updates so the newest value wins", async () => {
+  it("serializes rapid glass effect updates so the newest value wins", async () => {
     let resolveFirst: ((value: WindowPreferences) => void) | undefined;
     const saveWindowPreferences = vi
       .fn()
@@ -188,20 +192,20 @@ describe("App", () => {
     render(<App {...defaults} saveWindowPreferences={saveWindowPreferences} />);
     await screen.findAllByRole("progressbar");
     fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
-    const tint = screen.getByLabelText(/玻璃着色|Glass tint/);
-    fireEvent.change(tint, { target: { value: "0.55" } });
-    fireEvent.change(tint, { target: { value: "1" } });
+    const glassEffect = screen.getByLabelText(/玻璃效果|Glass effect/);
+    fireEvent.change(glassEffect, { target: { value: "0.2" } });
+    fireEvent.change(glassEffect, { target: { value: "0.9" } });
 
     await waitFor(() => expect(saveWindowPreferences).toHaveBeenCalledTimes(1));
     expect(saveWindowPreferences).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ opacity: 0.55 }),
+      expect.objectContaining({ glassLevel: 0.2 }),
     );
     await act(async () => resolveFirst?.(windowPreferences));
     await waitFor(() => expect(saveWindowPreferences).toHaveBeenCalledTimes(2));
     expect(saveWindowPreferences).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ opacity: 1 }),
+      expect.objectContaining({ glassLevel: 0.9 }),
     );
   });
 });
