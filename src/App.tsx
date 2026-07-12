@@ -94,13 +94,14 @@ export default function App({
   const [settings, setSettings] = useState<RefreshSettings>({
     intervalMinutes: 5,
     usageEnabled: false,
+    trayWindow: "five_hour",
     notifySeventy: false,
     notifyNinety: true,
     notifyHundred: true,
     notifyReset: false,
   });
   const [autostart, setAutostartValue] = useState(false);
-  const [appVersion, setAppVersion] = useState("1.1.0");
+  const [appVersion, setAppVersion] = useState("1.1.1");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
@@ -368,6 +369,19 @@ export default function App({
               />
             </SettingsGroup>
             <SettingsGroup title={t("dataGroup")}>
+              <SelectRow
+                label={t("trayWindow")}
+                value={settings.trayWindow}
+                onChange={(value) =>
+                  void updateSettings({
+                    trayWindow: value as RefreshSettings["trayWindow"],
+                  })
+                }
+                options={[
+                  ["five_hour", t("trayFiveHour")],
+                  ["seven_day", t("traySevenDay")],
+                ]}
+              />
               <SelectRow
                 label={t("refreshInterval")}
                 value={String(settings.intervalMinutes)}

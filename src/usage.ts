@@ -23,6 +23,7 @@ export type UsageView =
 export interface RefreshSettings {
   intervalMinutes: number;
   usageEnabled: boolean;
+  trayWindow: "five_hour" | "seven_day";
   notifySeventy: boolean;
   notifyNinety: boolean;
   notifyHundred: boolean;

@@ -52,13 +52,16 @@ async fn set_refresh_interval(
 
 #[tauri::command]
 async fn set_refresh_settings(
+    app: tauri::AppHandle,
     coordinator: State<'_, RefreshCoordinator>,
     settings: RefreshSettings,
 ) -> Result<RefreshSettings, UsageErrorPayload> {
-    coordinator
+    let saved = coordinator
         .set_settings(settings)
         .await
-        .map_err(UsageErrorPayload::from)
+        .map_err(UsageErrorPayload::from)?;
+    tray::update(&app, &coordinator.view().await, saved.tray_window);
+    Ok(saved)
 }
 
 #[tauri::command]
