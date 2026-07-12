@@ -46,7 +46,7 @@ const defaults = {
   saveSettings: vi.fn(),
   loadAutostart: vi.fn().mockResolvedValue(false),
   saveAutostart: vi.fn(),
-  loadAppVersion: vi.fn().mockResolvedValue("1.0.0"),
+  loadAppVersion: vi.fn().mockResolvedValue("1.1.0"),
   authorizeUsage: vi.fn().mockResolvedValue(ready),
   subscribe: vi.fn().mockResolvedValue(vi.fn()),
   loadWindowPreferences: vi.fn().mockResolvedValue(windowPreferences),
@@ -63,10 +63,33 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("renders detailed usage metadata", async () => {
+  it("renders remaining quota as a countdown from 100 to 0", async () => {
     render(<App {...defaults} />);
-    expect(await screen.findAllByRole("progressbar")).toHaveLength(2);
-    expect(screen.getByText(/剩余 58%|58% remaining/)).toBeInTheDocument();
+    const progressbars = await screen.findAllByRole("progressbar");
+    expect(progressbars).toHaveLength(2);
+    expect(progressbars.map((bar) => bar.getAttribute("aria-valuenow"))).toEqual(["58", "32"]);
+    expect(screen.getByText("58%")).toBeInTheDocument();
+    expect(screen.getByText("32%")).toBeInTheDocument();
+    expect(screen.getByText(/已使用 42%|42% used/)).toBeInTheDocument();
+  });
+
+  it("shows an empty quota as zero percent in red", async () => {
+    render(
+      <App
+        {...defaults}
+        loadUsage={vi.fn().mockResolvedValue({
+          ...ready,
+          snapshot: {
+            ...ready.snapshot,
+            windows: [{ id: "five_hour", label: "5 hours", usedPercent: 100 }],
+          },
+        })}
+      />,
+    );
+    const progressbar = await screen.findByRole("progressbar");
+    expect(progressbar).toHaveAttribute("aria-valuenow", "0");
+    expect(progressbar).toHaveClass("risk-track-limit");
+    expect(screen.getByText("0%")).toHaveClass("risk-text-limit");
   });
   it("starts dragging from the header", async () => {
     const dragWindow = vi.fn().mockResolvedValue(undefined);
@@ -90,6 +113,52 @@ describe("App", () => {
         expect.objectContaining({ mode: "compact" }),
       ),
     );
+  });
+
+  it("switches directly from compact to standard mode", async () => {
+    const saveWindowPreferences = vi.fn(async (preferences: WindowPreferences) => preferences);
+    const resizeView = vi.fn().mockResolvedValue(undefined);
+    render(
+      <App
+        {...defaults}
+        loadWindowPreferences={vi.fn().mockResolvedValue({
+          ...windowPreferences,
+          mode: "compact",
+        })}
+        saveWindowPreferences={saveWindowPreferences}
+        resizeView={resizeView}
+      />,
+    );
+
+    expect(await screen.findByText("58%")).toBeInTheDocument();
+    expect(screen.getByText("32%")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /切换到标准模式|Switch to standard mode/ }));
+
+    await waitFor(() =>
+      expect(saveWindowPreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: "detailed" }),
+      ),
+    );
+    expect(resizeView).toHaveBeenCalledWith("detailed");
+  });
+
+  it("switches directly from standard to compact mode", async () => {
+    const saveWindowPreferences = vi.fn(async (preferences: WindowPreferences) => preferences);
+    const resizeView = vi.fn().mockResolvedValue(undefined);
+    render(
+      <App {...defaults} saveWindowPreferences={saveWindowPreferences} resizeView={resizeView} />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /切换到紧凑模式|Switch to compact mode/ }),
+    );
+
+    await waitFor(() =>
+      expect(saveWindowPreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ mode: "compact" }),
+      ),
+    );
+    expect(resizeView).toHaveBeenCalledWith("compact");
   });
 
   it("keeps compact loading state inside the compact window", async () => {
@@ -146,7 +215,7 @@ describe("App", () => {
     expect(glassEffect.type).toBe("range");
     expect(glassEffect.value).toBe("0.5");
     expect(screen.queryByText(/诊断报告|Diagnostics/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Token用量 v1\.0|Token Usage v1\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/Token用量 v1\.1|Token Usage v1\.1/)).toBeInTheDocument();
     expect(screen.getByText(/Eric Zhang/)).toBeInTheDocument();
   });
 

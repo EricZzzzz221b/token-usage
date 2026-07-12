@@ -53,10 +53,14 @@ interface AppProps {
   resizeView?: (view: "compact" | "detailed" | "settings") => Promise<void>;
 }
 
-function riskClass(value: number) {
-  if (value >= 100) return "limit";
-  if (value >= 90) return "critical";
-  if (value >= 70) return "warning";
+function remainingPercent(usedPercent: number) {
+  return Math.max(0, Math.min(100, 100 - Math.round(usedPercent)));
+}
+
+function riskClass(remaining: number) {
+  if (remaining <= 0) return "limit";
+  if (remaining <= 10) return "critical";
+  if (remaining <= 30) return "warning";
   return "neutral";
 }
 
@@ -96,7 +100,7 @@ export default function App({
     notifyReset: false,
   });
   const [autostart, setAutostartValue] = useState(false);
-  const [appVersion, setAppVersion] = useState("1.0.0");
+  const [appVersion, setAppVersion] = useState("1.1.0");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
@@ -203,6 +207,11 @@ export default function App({
     setScreen("meter");
     await resizeView(preferencesRef.current.mode);
   };
+  const toggleWindowMode = () => {
+    const nextMode = preferencesRef.current.mode === "compact" ? "detailed" : "compact";
+    void updatePreferences({ mode: nextMode });
+    void resizeView(nextMode);
+  };
 
   const drag = (event: React.MouseEvent) => {
     if (event.button === 0 && !preferences.locked) void dragWindow();
@@ -237,16 +246,30 @@ export default function App({
             </button>
           ) : (
             readyWindows.map((window, index) => {
-              const used = Math.round(window.usedPercent);
+              const remaining = remainingPercent(window.usedPercent);
               return (
                 <span className="compact-metric" key={window.id}>
                   {index > 0 && <span className="metric-dot">·</span>}
                   <span className="metric-label">{windowShortLabel(window.id)}</span>
-                  <strong className={`metric-value risk-text-${riskClass(used)}`}>{used}%</strong>
+                  <strong className={`metric-value risk-text-${riskClass(remaining)}`}>
+                    {remaining}%
+                  </strong>
                 </span>
               );
             })
           )}
+          <button
+            className="compact-mode-toggle"
+            type="button"
+            aria-label={t("switchToStandard")}
+            title={t("switchToStandard")}
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={toggleWindowMode}
+          >
+            <svg aria-hidden="true" viewBox="0 0 16 16">
+              <path d="M2.5 5.25h8m-2.5-2.5 2.5 2.5-2.5 2.5M13.5 10.75h-8m2.5-2.5-2.5 2.5 2.5 2.5" />
+            </svg>
+          </button>
         </section>
       </main>
     );
@@ -271,6 +294,17 @@ export default function App({
                   type="button"
                 >
                   {refreshing ? t("refreshing") : t("refresh")}
+                </button>
+                <button
+                  className="icon-action mode-toggle-action"
+                  type="button"
+                  aria-label={t("switchToCompact")}
+                  title={t("switchToCompact")}
+                  onClick={toggleWindowMode}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 16 16">
+                    <path d="M2.5 5.25h8m-2.5-2.5 2.5 2.5-2.5 2.5M13.5 10.75h-8m2.5-2.5-2.5 2.5 2.5 2.5" />
+                  </svg>
                 </button>
                 <button className="text-action" onClick={openSettings} type="button">
                   {t("settingsTitle")}
@@ -457,28 +491,28 @@ function MeterContent({
       <div className="usage-list">
         {view.snapshot.windows.map((window) => {
           const used = Math.round(window.usedPercent);
-          const remaining = Math.max(0, 100 - used);
+          const remaining = remainingPercent(window.usedPercent);
           return (
             <article className="usage-window" key={window.id}>
               <div className="usage-heading">
                 <strong>{t(`windows.${window.id}`, { defaultValue: window.label })}</strong>
-                <strong className={`risk-text-${riskClass(used)}`}>{used}%</strong>
+                <strong className={`risk-text-${riskClass(remaining)}`}>{remaining}%</strong>
               </div>
               <div
-                aria-label={t("usedPercent", { value: used })}
+                aria-label={t("remainingPercent", { value: remaining })}
                 aria-valuemax={100}
                 aria-valuemin={0}
-                aria-valuenow={used}
-                className="progress-track"
+                aria-valuenow={remaining}
+                className={`progress-track risk-track-${riskClass(remaining)}`}
                 role="progressbar"
               >
                 <span
-                  className={`progress-fill risk-fill-${riskClass(used)}`}
-                  style={{ width: `${used}%` }}
+                  className={`progress-fill risk-fill-${riskClass(remaining)}`}
+                  style={{ width: `${remaining}%` }}
                 />
               </div>
               <div className="usage-meta">
-                <span>{t("remaining", { value: remaining })}</span>
+                <span>{t("used", { value: used })}</span>
                 {window.resetAt && (
                   <span>
                     {t("resetsShort", {
