@@ -10,14 +10,15 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
         "title": "Token用量",
-        "width": 480,
-        "height": 560,
-        "minWidth": 360,
-        "minHeight": 420,
+        "width": 360,
+        "height": 237,
+        "minWidth": 320,
+        "minHeight": 48,
         "center": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,

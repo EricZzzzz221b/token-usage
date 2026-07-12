@@ -16,8 +16,8 @@ pub enum WindowMode {
 #[serde(rename_all = "snake_case")]
 pub enum GlassStrength {
     Clear,
+    #[serde(alias = "rich")]
     Standard,
-    Rich,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -87,34 +87,89 @@ pub fn apply_preferences(
     window
         .set_ignore_cursor_events(preferences.click_through)
         .map_err(|_| UsageError::WindowUnavailable)?;
-    let (width, height) = match preferences.mode {
-        WindowMode::Compact => (360.0, 260.0),
-        WindowMode::Detailed => (440.0, 560.0),
-    };
-    window
-        .set_size(tauri::LogicalSize::new(width, height))
-        .map_err(|_| UsageError::WindowUnavailable)?;
-    apply_glass(app, preferences.glass_strength)
+    apply_glass(app, preferences.glass_strength, preferences.opacity)
 }
 
-pub fn apply_glass(app: &AppHandle, strength: GlassStrength) -> Result<(), UsageError> {
+pub fn resize_for_view(app: &AppHandle, view: &str) -> Result<(), UsageError> {
+    let (width, height, radius) = match view {
+        "compact" => (320.0, 48.0, 17.0),
+        "detailed" => (360.0, 237.0, 22.0),
+        "settings" => (480.0, 680.0, 24.0),
+        _ => return Err(UsageError::InvalidSettings),
+    };
+    main_window(app)?
+        .set_size(tauri::LogicalSize::new(width, height))
+        .map_err(|_| UsageError::WindowUnavailable)?;
+    let preferences = load_preferences(app);
+    apply_glass_with_radius(app, preferences.glass_strength, preferences.opacity, radius)
+}
+
+pub fn apply_glass(
+    app: &AppHandle,
+    strength: GlassStrength,
+    opacity: f64,
+) -> Result<(), UsageError> {
+    let window = main_window(app)?;
+    let logical_size = window
+        .inner_size()
+        .map_err(|_| UsageError::WindowUnavailable)?
+        .to_logical::<f64>(
+            window
+                .scale_factor()
+                .map_err(|_| UsageError::WindowUnavailable)?,
+        );
+    let radius = if logical_size.height <= 80.0 {
+        17.0
+    } else if logical_size.width >= 440.0 {
+        24.0
+    } else {
+        22.0
+    };
+    apply_glass_with_radius(app, strength, opacity, radius)
+}
+
+fn apply_glass_with_radius(
+    app: &AppHandle,
+    strength: GlassStrength,
+    opacity: f64,
+    radius: f64,
+) -> Result<(), UsageError> {
     let window = main_window(app)?;
     #[cfg(target_os = "macos")]
     {
+        unsafe extern "C" {
+            fn token_usage_apply_liquid_glass(
+                view_pointer: *mut std::ffi::c_void,
+                style: i32,
+                corner_radius: f64,
+                opacity: f64,
+            ) -> bool;
+        }
+
         use window_vibrancy::{
             apply_vibrancy, clear_vibrancy, NSVisualEffectMaterial, NSVisualEffectState,
         };
+        let ns_view = window
+            .ns_view()
+            .map_err(|_| UsageError::WindowUnavailable)?;
+        let style = match strength {
+            GlassStrength::Clear => 0,
+            GlassStrength::Standard => 1,
+        };
+        if unsafe { token_usage_apply_liquid_glass(ns_view, style, radius, opacity) } {
+            return Ok(());
+        }
+
         let _ = clear_vibrancy(&window);
         let material = match strength {
             GlassStrength::Clear => NSVisualEffectMaterial::UnderWindowBackground,
             GlassStrength::Standard => NSVisualEffectMaterial::HudWindow,
-            GlassStrength::Rich => NSVisualEffectMaterial::Popover,
         };
         apply_vibrancy(
             &window,
             material,
             Some(NSVisualEffectState::Active),
-            Some(22.0),
+            Some(radius),
         )
         .map_err(|_| UsageError::WindowUnavailable)?;
     }
@@ -158,11 +213,20 @@ mod tests {
         let preferences = WindowPreferences {
             mode: WindowMode::Compact,
             locked: true,
-            glass_strength: GlassStrength::Rich,
+            glass_strength: GlassStrength::Clear,
             ..WindowPreferences::default()
         };
         let encoded = serde_json::to_string(&preferences).expect("serialize");
         let decoded: WindowPreferences = serde_json::from_str(&encoded).expect("deserialize");
         assert_eq!(decoded, preferences);
+    }
+
+    #[test]
+    fn migrates_legacy_rich_glass_to_standard() {
+        let decoded: WindowPreferences = serde_json::from_str(
+            r#"{"mode":"detailed","alwaysOnTop":true,"locked":false,"clickThrough":false,"opacity":0.8,"glassStrength":"rich"}"#,
+        )
+        .expect("deserialize legacy preferences");
+        assert_eq!(decoded.glass_strength, GlassStrength::Standard);
     }
 }

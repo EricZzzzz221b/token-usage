@@ -38,7 +38,12 @@ pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()
                     crate::window::WindowMode::Compact => crate::window::WindowMode::Detailed,
                     crate::window::WindowMode::Detailed => crate::window::WindowMode::Compact,
                 };
+                let view = match preferences.mode {
+                    crate::window::WindowMode::Compact => "compact",
+                    crate::window::WindowMode::Detailed => "detailed",
+                };
                 let _ = crate::window::apply_preferences(app, &preferences);
+                let _ = crate::window::resize_for_view(app, view);
                 let _ = crate::window::save_preferences(app, &preferences);
                 let _ = app.emit("window://preferences", &preferences);
                 show_window(app);

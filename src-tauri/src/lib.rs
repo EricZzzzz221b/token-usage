@@ -179,11 +179,17 @@ fn start_window_drag(app: tauri::AppHandle) -> Result<(), UsageErrorPayload> {
 }
 
 #[tauri::command]
+fn resize_window_for_view(app: tauri::AppHandle, view: String) -> Result<(), UsageErrorPayload> {
+    window::resize_for_view(&app, &view).map_err(UsageErrorPayload::from)
+}
+
+#[tauri::command]
 fn set_glass_strength(
     app: tauri::AppHandle,
     strength: GlassStrength,
 ) -> Result<(), UsageErrorPayload> {
-    window::apply_glass(&app, strength).map_err(UsageErrorPayload::from)
+    let opacity = window::load_preferences(&app).opacity;
+    window::apply_glass(&app, strength, opacity).map_err(UsageErrorPayload::from)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -210,7 +216,12 @@ pub fn run() {
             app.manage(coordinator.clone());
             tray::setup(app, coordinator.clone())?;
             let preferences = window::load_preferences(app.handle());
+            let initial_view = match preferences.mode {
+                window::WindowMode::Compact => "compact",
+                window::WindowMode::Detailed => "detailed",
+            };
             window::apply_preferences(app.handle(), &preferences)?;
+            window::resize_for_view(app.handle(), initial_view)?;
             if let Some(main) = app.get_webview_window("main") {
                 let window = main.clone();
                 main.on_window_event(move |event| {
@@ -238,6 +249,7 @@ pub fn run() {
             get_window_preferences,
             set_window_preferences,
             start_window_drag,
+            resize_window_for_view,
             set_glass_strength
         ])
         .run(tauri::generate_context!())

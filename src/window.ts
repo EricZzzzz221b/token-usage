@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type WindowMode = "compact" | "detailed";
-export type GlassStrength = "clear" | "standard" | "rich";
+export type GlassStrength = "clear" | "standard";
 
 export interface WindowPreferences {
   mode: WindowMode;
@@ -23,6 +23,10 @@ export function setWindowPreferences(preferences: WindowPreferences): Promise<Wi
 
 export function startWindowDrag(): Promise<void> {
   return invoke<void>("start_window_drag");
+}
+
+export function resizeWindowForView(view: "compact" | "detailed" | "settings"): Promise<void> {
+  return invoke<void>("resize_window_for_view", { view });
 }
 
 export function onWindowPreferences(

@@ -52,6 +52,7 @@ const defaults = {
   saveWindowPreferences: vi.fn().mockResolvedValue(windowPreferences),
   dragWindow: vi.fn().mockResolvedValue(undefined),
   subscribeWindowPreferences: vi.fn().mockResolvedValue(vi.fn()),
+  resizeView: vi.fn().mockResolvedValue(undefined),
 };
 
 afterEach(() => {
@@ -78,7 +79,7 @@ describe("App", () => {
       .mockResolvedValue({ ...windowPreferences, mode: "compact" });
     render(<App {...defaults} saveWindowPreferences={saveWindowPreferences} />);
     await screen.findAllByRole("progressbar");
-    fireEvent.click(screen.getByRole("button", { name: /浮窗设置|Widget settings/ }));
+    fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
     fireEvent.change(screen.getByLabelText(/浮窗模式|Widget mode/), {
       target: { value: "compact" },
     });
