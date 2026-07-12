@@ -113,14 +113,15 @@ static bool token_usage_apply_liquid_glass_impl(void *view_pointer,
   standard_glass.cornerRadius = corner_radius + TokenUsageFillOverscan;
 
   CGFloat level = MAX(0.0, MIN(1.0, glass_level));
-  clear_glass.alphaValue = 1.0;
-  standard_glass.alphaValue = level * 0.9;
+  // Keep the lens geometry constant without letting the active-window
+  // highlight stack into an overly bright white surface.
+  clear_glass.alphaValue = 0.78;
+  standard_glass.alphaValue = level * 0.72;
   clear_glass.hidden = NO;
   standard_glass.hidden = level <= 0.001;
-  clear_glass.tintColor =
-      [NSColor colorWithWhite:0.84 alpha:0.012];
+  clear_glass.tintColor = nil;
   standard_glass.tintColor =
-      [NSColor colorWithWhite:0.72 alpha:0.115];
+      [NSColor colorWithWhite:0.58 alpha:0.06];
 
   host.layer.cornerRadius = corner_radius;
   host.layer.cornerCurve = kCACornerCurveContinuous;
@@ -156,10 +157,10 @@ static void token_usage_apply_fallback_tint_impl(void *view_pointer,
                                                  double glass_level) {
   NSView *content = (__bridge NSView *)view_pointer;
   CGFloat level = MAX(0.0, MIN(1.0, glass_level));
-  CGFloat tint_alpha = 0.008 + level * 0.09;
+  CGFloat tint_alpha = 0.002 + level * 0.055;
   content.wantsLayer = YES;
   content.layer.backgroundColor =
-      [NSColor colorWithWhite:0.76 alpha:tint_alpha].CGColor;
+      [NSColor colorWithWhite:0.65 alpha:tint_alpha].CGColor;
   content.layer.borderWidth = 0;
   content.layer.borderColor = NSColor.clearColor.CGColor;
 }
