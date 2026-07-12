@@ -6,7 +6,10 @@
 static const void *TokenUsageClearGlassKey = &TokenUsageClearGlassKey;
 static const void *TokenUsageStandardGlassKey = &TokenUsageStandardGlassKey;
 static const void *TokenUsageGlassHostKey = &TokenUsageGlassHostKey;
-static const CGFloat TokenUsageGlassOverscan = 3.0;
+// Keep the system glass perimeter just outside the clipping host. A 2.5pt
+// overscan preserves the clean corners while letting a little more of the
+// native lens refraction reach the visible edge.
+static const CGFloat TokenUsageGlassOverscan = 2.5;
 
 // Compile against older macOS SDKs used by CI while resolving the macOS 26
 // implementation dynamically at runtime.
@@ -111,9 +114,10 @@ static bool token_usage_apply_liquid_glass_impl(void *view_pointer,
   standard_glass.alphaValue = level;
   clear_glass.hidden = level >= 0.999;
   standard_glass.hidden = level <= 0.001;
-  clear_glass.tintColor = nil;
+  clear_glass.tintColor =
+      [NSColor colorWithWhite:0.84 alpha:0.012];
   standard_glass.tintColor =
-      [NSColor colorWithWhite:0.72 alpha:0.10];
+      [NSColor colorWithWhite:0.72 alpha:0.115];
 
   host.layer.cornerRadius = corner_radius;
   host.layer.cornerCurve = kCACornerCurveContinuous;
@@ -149,7 +153,7 @@ static void token_usage_apply_fallback_tint_impl(void *view_pointer,
                                                  double glass_level) {
   NSView *content = (__bridge NSView *)view_pointer;
   CGFloat level = MAX(0.0, MIN(1.0, glass_level));
-  CGFloat tint_alpha = level * 0.085;
+  CGFloat tint_alpha = 0.008 + level * 0.09;
   content.wantsLayer = YES;
   content.layer.backgroundColor =
       [NSColor colorWithWhite:0.76 alpha:tint_alpha].CGColor;
