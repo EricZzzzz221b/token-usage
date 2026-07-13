@@ -1,39 +1,18 @@
-name: CI
+name: Release Windows
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Windows release tag
+        required: true
+        default: windows-v1.0.0
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  macos-check:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: ./src-tauri -> target
-      - run: npm ci
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
-      - run: npm run tauri:build
-
-  windows-x64:
+  release-windows-x64:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -43,20 +22,13 @@ jobs:
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt, clippy
           targets: x86_64-pc-windows-msvc
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
       - run: npm ci
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --all-targets -- -D warnings
-      - name: Build MSI and NSIS installers
-        run: npm run tauri -- build --target x86_64-pc-windows-msvc --bundles msi,nsis
+      - run: npm run check
+      - run: npm run tauri -- build --target x86_64-pc-windows-msvc --bundles msi,nsis
       - name: Normalize release filenames and checksums
         shell: pwsh
         run: |
@@ -65,11 +37,14 @@ jobs:
           Copy-Item (Get-ChildItem src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe | Select-Object -First 1) outputs/TokenUsage_Windows_1.0.0_x64-setup.exe
           Get-FileHash outputs/TokenUsage_Windows_1.0.0_x64.msi -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  TokenUsage_Windows_1.0.0_x64.msi" } | Set-Content outputs/SHA256SUMS-Windows-1.0.0.txt
           Get-FileHash outputs/TokenUsage_Windows_1.0.0_x64-setup.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  TokenUsage_Windows_1.0.0_x64-setup.exe" } | Add-Content outputs/SHA256SUMS-Windows-1.0.0.txt
-      - uses: actions/upload-artifact@v6
+      - uses: softprops/action-gh-release@v2
         with:
-          name: TokenUsage-Windows-1.0.0-x64
-          path: |
+          tag_name: ${{ inputs.tag }}
+          name: Token用量 Windows v1.0.0
+          body_path: docs/release-notes-windows-v1.0.0.md
+          draft: false
+          prerelease: false
+          files: |
             outputs/TokenUsage_Windows_1.0.0_x64.msi
             outputs/TokenUsage_Windows_1.0.0_x64-setup.exe
             outputs/SHA256SUMS-Windows-1.0.0.txt
-          if-no-files-found: error

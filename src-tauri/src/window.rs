@@ -87,8 +87,17 @@ pub fn apply_preferences(
 
 pub fn resize_for_view(app: &AppHandle, view: &str) -> Result<(), UsageError> {
     let (width, height, radius) = match view {
+        #[cfg(target_os = "windows")]
+        "compact" => (340.0, 52.0, 12.0),
+        #[cfg(not(target_os = "windows"))]
         "compact" => (320.0, 48.0, 17.0),
+        #[cfg(target_os = "windows")]
+        "detailed" => (380.0, 258.0, 14.0),
+        #[cfg(not(target_os = "windows"))]
         "detailed" => (360.0, 237.0, 22.0),
+        #[cfg(target_os = "windows")]
+        "settings" => (500.0, 720.0, 16.0),
+        #[cfg(not(target_os = "windows"))]
         "settings" => (480.0, 680.0, 24.0),
         _ => return Err(UsageError::InvalidSettings),
     };
@@ -133,7 +142,7 @@ pub fn background_is_dark(app: &AppHandle) -> Result<bool, UsageError> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        Ok(false)
+        Ok(matches!(window.theme(), Ok(tauri::Theme::Dark)))
     }
 }
 
@@ -177,6 +186,23 @@ fn apply_glass_with_radius(
         .map_err(|_| UsageError::WindowUnavailable)?;
         unsafe { token_usage_apply_fallback_tint(ns_view, glass_level) };
     }
+
+    #[cfg(target_os = "windows")]
+    {
+        use window_vibrancy::{apply_acrylic, apply_mica};
+
+        // Mica follows the Windows 11 system theme. Windows 10 falls back to
+        // Acrylic; if DWM composition is unavailable, CSS supplies an opaque,
+        // readable surface and the app remains fully usable.
+        if apply_mica(&window, None).is_err() {
+            let alpha = (120.0 + glass_level * 95.0).round() as u8;
+            let _ = apply_acrylic(&window, Some((32, 36, 43, alpha)));
+        }
+        let _ = radius;
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let _ = (window, glass_level, radius);
     Ok(())
 }
 

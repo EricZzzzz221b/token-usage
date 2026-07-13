@@ -1,10 +1,14 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, path::PathBuf};
+
+#[cfg(target_os = "macos")]
+use std::process::Command;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::UsageError;
 
+#[cfg(target_os = "macos")]
 const KEYCHAIN_SERVICE: &str = "Codex Auth";
 const STALE_AFTER_DAYS: i64 = 8;
 
@@ -189,5 +193,20 @@ mod tests {
     fn resolves_custom_codex_home() {
         let path = codex_auth_path_from(Some("/tmp/custom-codex".into()), None);
         assert_eq!(path, PathBuf::from("/tmp/custom-codex/auth.json"));
+    }
+
+    #[test]
+    fn resolves_non_ascii_codex_home_with_spaces() {
+        let home = PathBuf::from("Codex 测试 用户");
+        let path = codex_auth_path_from(Some(home.clone().into_os_string()), None);
+        assert_eq!(path, home.join("auth.json"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn resolves_windows_user_profile_default() {
+        let profile = PathBuf::from(r"C:\Users\测试 用户");
+        let path = codex_auth_path_from(None, Some(profile.clone()));
+        assert_eq!(path, profile.join(".codex").join("auth.json"));
     }
 }

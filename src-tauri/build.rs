@@ -1,4 +1,5 @@
 fn main() {
+    // Keep every Objective-C source and Apple framework outside non-macOS builds.
     #[cfg(target_os = "macos")]
     {
         println!("cargo:rerun-if-changed=native/liquid_glass.m");

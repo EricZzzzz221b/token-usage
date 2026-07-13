@@ -53,3 +53,9 @@ export function setRefreshSettings(settings: RefreshSettings): Promise<RefreshSe
 export function onUsageUpdated(handler: (view: UsageView) => void): Promise<UnlistenFn> {
   return listen<UsageView>("usage://updated", (event) => handler(event.payload));
 }
+
+export function onRefreshSettingsChanged(
+  handler: (settings: RefreshSettings) => void,
+): Promise<UnlistenFn> {
+  return listen<RefreshSettings>("usage://settings-changed", (event) => handler(event.payload));
+}

@@ -51,6 +51,7 @@ const defaults = {
   loadAppVersion: vi.fn().mockResolvedValue("1.1.0"),
   authorizeUsage: vi.fn().mockResolvedValue(ready),
   subscribe: vi.fn().mockResolvedValue(vi.fn()),
+  subscribeSettings: vi.fn().mockResolvedValue(vi.fn()),
   loadWindowPreferences: vi.fn().mockResolvedValue(windowPreferences),
   saveWindowPreferences: vi.fn().mockResolvedValue(windowPreferences),
   dragWindow: vi.fn().mockResolvedValue(undefined),
@@ -228,7 +229,7 @@ describe("App", () => {
     const glassEffect = screen.getByLabelText(/玻璃效果|Glass effect/) as HTMLInputElement;
     expect(glassEffect.type).toBe("range");
     expect(glassEffect.value).toBe("0.5");
-    const trayWindow = screen.getByLabelText(/状态栏显示周期|Menu bar window/);
+    const trayWindow = screen.getByLabelText(/托盘显示周期|System tray window/);
     expect(trayWindow).toHaveValue("seven_day");
     fireEvent.change(trayWindow, { target: { value: "five_hour" } });
     await waitFor(() =>
@@ -237,7 +238,7 @@ describe("App", () => {
       ),
     );
     expect(screen.queryByText(/诊断报告|Diagnostics/)).not.toBeInTheDocument();
-    expect(screen.getByText(/Token用量 v1\.1|Token Usage v1\.1/)).toBeInTheDocument();
+    expect(screen.getByText(/Token用量 v1\.1\.0|Token Usage v1\.1\.0/)).toBeInTheDocument();
     expect(screen.getByText(/Eric Zhang/)).toBeInTheDocument();
   });
 

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   getRefreshSettings,
   getUsage,
+  onRefreshSettingsChanged,
   onUsageUpdated,
   refreshUsage,
   setRefreshInterval,
@@ -38,6 +39,7 @@ interface AppProps {
   saveInterval?: (minutes: number) => Promise<RefreshSettings>;
   saveSettings?: (settings: RefreshSettings) => Promise<RefreshSettings>;
   subscribe?: (handler: (view: UsageView) => void) => Promise<() => void>;
+  subscribeSettings?: (handler: (settings: RefreshSettings) => void) => Promise<() => void>;
   loadWindowPreferences?: () => Promise<WindowPreferences>;
   saveWindowPreferences?: (preferences: WindowPreferences) => Promise<WindowPreferences>;
   dragWindow?: () => Promise<void>;
@@ -80,6 +82,7 @@ export default function App({
   saveInterval = setRefreshInterval,
   saveSettings = setRefreshSettings,
   subscribe = onUsageUpdated,
+  subscribeSettings = onRefreshSettingsChanged,
   loadWindowPreferences = getWindowPreferences,
   saveWindowPreferences = setWindowPreferences,
   dragWindow = startWindowDrag,
@@ -140,9 +143,13 @@ export default function App({
     });
     let active = true;
     let unlisten: (() => void) | undefined;
+    let unlistenSettings: (() => void) | undefined;
     let unlistenWindow: (() => void) | undefined;
     let unlistenMode: (() => void) | undefined;
     void subscribe(setView).then((cleanup) => (active ? (unlisten = cleanup) : cleanup()));
+    void subscribeSettings(setSettings).then((cleanup) =>
+      active ? (unlistenSettings = cleanup) : cleanup(),
+    );
     void subscribeWindowPreferences((next) => {
       preferencesRef.current = next;
       setPreferences(next);
@@ -155,6 +162,7 @@ export default function App({
     return () => {
       active = false;
       unlisten?.();
+      unlistenSettings?.();
       unlistenWindow?.();
       unlistenMode?.();
     };
@@ -165,6 +173,7 @@ export default function App({
     loadUsage,
     loadWindowPreferences,
     subscribe,
+    subscribeSettings,
     subscribeWindowPreferences,
     subscribeWindowModeChanged,
   ]);
@@ -219,6 +228,7 @@ export default function App({
 
   const compact = preferences.mode === "compact" && screen === "meter";
   const textToneClass = darkBackdrop ? "text-tone-light" : "text-tone-dark";
+  const platformClass = navigator.userAgent.includes("Windows") ? "platform-windows" : "";
   const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
 
   const openSettings = () => {
@@ -242,7 +252,7 @@ export default function App({
 
   if (compact) {
     return (
-      <main className={`app-shell compact-shell ${textToneClass}`}>
+      <main className={`app-shell compact-shell ${textToneClass} ${platformClass}`}>
         <section className="liquid-panel compact-panel" onMouseDown={drag}>
           <strong className="brand-word">Codex</strong>
           {!settings.usageEnabled ? (
@@ -300,7 +310,7 @@ export default function App({
 
   return (
     <main
-      className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"} ${textToneClass}`}
+      className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"} ${textToneClass} ${platformClass}`}
     >
       <section className="liquid-panel">
         <header className="titlebar" onMouseDown={drag}>
@@ -462,7 +472,7 @@ export default function App({
             </SettingsGroup>
             <div className="about-meta">
               <span>
-                {t("appName")} v{appVersion.split(".").slice(0, 2).join(".")}
+                {t("appName")} v{appVersion}
               </span>
               <span>{t("author", { value: "Eric Zhang" })}</span>
             </div>

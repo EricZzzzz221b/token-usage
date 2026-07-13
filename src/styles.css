@@ -14,9 +14,16 @@
   --text-shadow-color: rgba(255, 255, 255, 0.58);
   --warning-text: #bd5d00;
   --critical-text: #c9342f;
+  --window-surface: rgba(246, 249, 252, 0.82);
   color: var(--text-primary);
   color-scheme: light dark;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-family:
+    "Segoe UI Variable Text",
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -36,6 +43,7 @@
   --text-shadow-color: rgba(0, 0, 0, 0.72);
   --warning-text: #f2a13a;
   --critical-text: #ff716a;
+  --window-surface: rgba(25, 29, 35, 0.84);
   color: var(--text-primary);
   color-scheme: dark;
 }
@@ -55,6 +63,7 @@
   --text-shadow-color: rgba(255, 255, 255, 0.58);
   --warning-text: #bd5d00;
   --critical-text: #c9342f;
+  --window-surface: rgba(246, 249, 252, 0.82);
   color: var(--text-primary);
   color-scheme: light;
 }
@@ -96,6 +105,19 @@ button {
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+.platform-windows {
+  padding: 1px;
+}
+.platform-windows .liquid-panel {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+  border-radius: 14px;
+  background: var(--window-surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+.platform-windows.compact-shell .liquid-panel {
+  border-radius: 12px;
 }
 .compact-panel {
   display: flex;
@@ -505,6 +527,40 @@ footer,
     --text-shadow-color: rgba(0, 0, 0, 0.72);
     --warning-text: #f2a13a;
     --critical-text: #ff716a;
+    --window-surface: rgba(25, 29, 35, 0.84);
+  }
+}
+@media (prefers-contrast: more) {
+  .platform-windows .liquid-panel {
+    border-color: currentColor;
+    background: Canvas;
+    color: CanvasText;
+  }
+}
+@media (forced-colors: active) {
+  :root,
+  .text-tone-light,
+  .text-tone-dark {
+    --text-primary: CanvasText;
+    --text-secondary: CanvasText;
+    --text-strong-secondary: CanvasText;
+    --text-tertiary: CanvasText;
+    --text-muted: GrayText;
+    --action-color: LinkText;
+    --warning-text: MarkText;
+    --critical-text: MarkText;
+    --window-surface: Canvas;
+  }
+  .platform-windows .liquid-panel,
+  .settings-card,
+  .state-card {
+    border: 1px solid CanvasText;
+    background: Canvas;
+    box-shadow: none;
+  }
+  .progress-fill {
+    forced-color-adjust: none;
+    background: Highlight;
   }
 }
 @media (prefers-reduced-motion: reduce) {
