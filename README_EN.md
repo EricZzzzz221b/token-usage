@@ -8,27 +8,27 @@
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0">
-  <img src="https://img.shields.io/badge/macOS-v1.1.3-111111?logo=apple" alt="macOS v1.1.3"><br>
-  <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2">
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0"><img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.3"><img src="https://img.shields.io/badge/macOS-v1.1.3-111111?logo=apple" alt="macOS v1.1.3"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><strong>Download</strong></a>
+  <a href="#download-and-install"><strong>Download</strong></a>
   · <a href="CHANGELOG.md">Changelog</a>
   · <a href="README.md">中文</a>
 </p>
 
-Token Usage is a lightweight cross-platform utility that reads your local Codex sign-in, shows the remaining quota and reset time for the 5-hour and 7-day windows, and can notify you when quota is running low.
+Token Usage is a lightweight cross-platform utility that reads your local Codex sign-in, shows the remaining quota and reset time for the 5-hour and 7-day windows, and can notify you when quota is running low. Windows and macOS installers are published together on the [Releases](https://github.com/EricZzzzz221b/token-usage/releases) page.
 
 ## Features
 
 - Remaining quota shown as 100% when full and 0% when exhausted
-- Choose the 5-hour or 7-day window in the menu bar
-- Detailed and compact desktop widgets
+- Choose the 5-hour or 7-day window in the system tray or menu bar
+- Detailed and compact widgets with quick switching from the widget or tray
 - Manual refresh, configurable refresh interval, and quota alerts
 - Always on top, position lock, click-through, and launch at login
-- Automatic foreground contrast based on the desktop background
+- Windows 11 Mica, Windows 10 Acrylic, and a readable solid-color fallback
+- Automatic light/dark contrast and basic Windows high-contrast support
 - Simplified Chinese and English interface
 
 ## Preview
@@ -48,18 +48,18 @@ Token Usage is a lightweight cross-platform utility that reads your local Codex 
 
 ## Download and install
 
-| Platform                         | Status    | Version and download                                                                                                                                      |
-| -------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows 11 / Windows 10 22H2 x64 | Available | [MSI](outputs/TokenUsage_Windows_1.0.0_x64.msi) · [EXE](outputs/TokenUsage_Windows_1.0.0_x64-setup.exe) · [SHA-256](outputs/SHA256SUMS-Windows-1.0.0.txt) |
-| macOS 13+ Apple Silicon          | Available | [v1.1.3 DMG](outputs/TokenUsage_1.1.3_arm64.dmg) · [Release notes](outputs/TokenUsage_1.1.3_ReleaseNotes.md)                                              |
+| Platform                         | Status    | Version and download                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows 11 / Windows 10 22H2 x64 | Available | [v1.0.0](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/TokenUsage_Windows_1.0.0_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/TokenUsage_Windows_1.0.0_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/SHA256SUMS-Windows-1.0.0.txt) |
+| macOS 13+ Apple Silicon          | Available | [v1.1.3](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.3) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.3/TokenUsage_1.1.3_arm64.dmg)                                                                                                                                                                                                                                                                             |
 
-The macOS build requires macOS 13 or later and a Codex client or CLI signed in with ChatGPT OAuth.
+### Windows v1.0.0
 
-1. Download the latest `.dmg` from [Releases](https://github.com/EricZzzzz221b/token-usage/releases/latest).
-2. Open the DMG and drag `Token用量.app` into `Applications`.
-3. The current build is not Apple-notarized. On first launch, right-click the app in Finder, choose **Open**, and confirm once more.
+The first Windows release supports x64 only. Prefer the MSI, or use the NSIS setup EXE. The installers are unsigned, so verify the published SHA-256 before using **More info → Run anyway** in SmartScreen. The embedded WebView2 bootstrapper starts Microsoft's installation flow if the runtime is missing. Uninstall from **Settings → Apps → Installed apps**. See the [Windows v1.0.0 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0) for details.
 
-Windows v1.0.0 currently supports x64 only. Prefer the MSI, or use the NSIS setup EXE. The installers are unsigned, so verify the published SHA-256 before using **More info → Run anyway** in SmartScreen. The embedded WebView2 bootstrapper starts Microsoft's installation flow if the runtime is missing. Uninstall from **Settings → Apps → Installed apps**. See the [Windows release notes](docs/release-notes-windows-v1.0.0.md) for details.
+### macOS v1.1.3
+
+Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.3/TokenUsage_1.1.3_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. The current build is not Apple-notarized. On first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
 ## Privacy
 
