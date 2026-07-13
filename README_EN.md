@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0"><img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.3"><img src="https://img.shields.io/badge/macOS-v1.1.3-111111?logo=apple" alt="macOS v1.1.3"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.4"><img src="https://img.shields.io/badge/macOS-v1.1.4-111111?logo=apple" alt="macOS v1.1.4"></a>
 </p>
 
 <p align="center">
@@ -51,15 +51,15 @@ Token Usage is a lightweight cross-platform utility that reads your local Codex 
 | Platform                         | Status    | Version and download                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Windows 11 / Windows 10 22H2 x64 | Available | [v1.0.0](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/TokenUsage_Windows_1.0.0_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/TokenUsage_Windows_1.0.0_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/SHA256SUMS-Windows-1.0.0.txt) |
-| macOS 13+ Apple Silicon          | Available | [v1.1.3](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.3) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.3/TokenUsage_1.1.3_arm64.dmg)                                                                                                                                                                                                                                                                             |
+| macOS 13+ Apple Silicon          | Available | [v1.1.4](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.4) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.4/TokenUsage_1.1.4_arm64.dmg)                                                                                                                                                                                                                                                                             |
 
 ### Windows v1.0.0
 
 The first Windows release supports x64 only. Prefer the MSI, or use the NSIS setup EXE. The installers are unsigned, so verify the published SHA-256 before using **More info → Run anyway** in SmartScreen. The embedded WebView2 bootstrapper starts Microsoft's installation flow if the runtime is missing. Uninstall from **Settings → Apps → Installed apps**. See the [Windows v1.0.0 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0) for details.
 
-### macOS v1.1.3
+### macOS v1.1.4
 
-Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.3/TokenUsage_1.1.3_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. The current build is not Apple-notarized. On first launch, right-click the app in Finder, choose **Open**, and confirm once more.
+Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.4/TokenUsage_1.1.4_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. v1.1.4 uses Apple’s `NSGlassEffectView.contentView` structure for local adaptive colors without reading the wallpaper, capturing the screen, or requesting Screen Recording permission. The current build is not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
 ## Privacy
 

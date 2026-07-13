@@ -58,7 +58,8 @@ const defaults = {
   subscribeWindowPreferences: vi.fn().mockResolvedValue(vi.fn()),
   subscribeWindowModeChanged: vi.fn().mockResolvedValue(vi.fn()),
   resizeView: vi.fn().mockResolvedValue(undefined),
-  detectDarkBackdrop: vi.fn().mockResolvedValue(false),
+  detectBackdrop: vi.fn().mockResolvedValue("light" as const),
+  backdropPollIntervalMs: 10,
 };
 
 afterEach(() => {
@@ -119,14 +120,25 @@ describe("App", () => {
     );
   });
 
-  it("automatically uses light text over a dark desktop background", async () => {
-    render(<App {...defaults} detectDarkBackdrop={vi.fn().mockResolvedValue(true)} />);
-    await waitFor(() => expect(document.querySelector("main")).toHaveClass("text-tone-light"));
+  it("adapts to a dark surface behind the widget", async () => {
+    render(<App {...defaults} detectBackdrop={vi.fn().mockResolvedValue("dark")} />);
+    await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-dark"));
   });
 
-  it("automatically uses dark text over a light desktop background", async () => {
-    render(<App {...defaults} detectDarkBackdrop={vi.fn().mockResolvedValue(false)} />);
-    await waitFor(() => expect(document.querySelector("main")).toHaveClass("text-tone-dark"));
+  it("adapts to a light surface behind the widget", async () => {
+    render(<App {...defaults} detectBackdrop={vi.fn().mockResolvedValue("light")} />);
+    await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-light"));
+  });
+
+  it("changes after the surface behind the widget changes", async () => {
+    const samples = ["light", "light", "dark", "dark"] as const;
+    let index = 0;
+    const detectBackdrop = vi.fn(async () => samples[Math.min(index++, samples.length - 1)]);
+    render(<App {...defaults} detectBackdrop={detectBackdrop} />);
+
+    await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-light"));
+    await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-dark"));
+    expect(detectBackdrop).toHaveBeenCalledTimes(4);
   });
 
   it("switches directly from compact to standard mode", async () => {

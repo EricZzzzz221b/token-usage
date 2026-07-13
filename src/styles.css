@@ -27,7 +27,7 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
-.text-tone-light {
+.backdrop-dark {
   --text-primary: #f1f4f7;
   --text-secondary: rgba(242, 246, 250, 0.86);
   --text-strong-secondary: rgba(246, 249, 252, 0.94);
@@ -47,7 +47,7 @@
   color: var(--text-primary);
   color-scheme: dark;
 }
-.text-tone-dark {
+.backdrop-light {
   --text-primary: #111b24;
   --text-secondary: rgba(20, 30, 40, 0.8);
   --text-strong-secondary: rgba(18, 28, 38, 0.9);
@@ -539,8 +539,8 @@ footer,
 }
 @media (forced-colors: active) {
   :root,
-  .text-tone-light,
-  .text-tone-dark {
+  .backdrop-dark,
+  .backdrop-light {
     --text-primary: CanvasText;
     --text-secondary: CanvasText;
     --text-strong-secondary: CanvasText;

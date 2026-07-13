@@ -14,13 +14,14 @@ import {
 } from "./usage";
 import { enableUsage, ensureNotificationPermission, getAutostart, setAutostart } from "./system";
 import {
-  backgroundIsDark,
+  getBackdropTone,
   getWindowPreferences,
   onWindowModeChanged,
   onWindowPreferences,
   resizeWindowForView,
   setWindowPreferences,
   startWindowDrag,
+  type BackdropTone,
   type WindowPreferences,
 } from "./window";
 
@@ -54,7 +55,8 @@ interface AppProps {
   loadAppVersion?: () => Promise<string>;
   authorizeUsage?: () => Promise<UsageView>;
   resizeView?: (view: "compact" | "detailed" | "settings") => Promise<void>;
-  detectDarkBackdrop?: () => Promise<boolean>;
+  detectBackdrop?: () => Promise<BackdropTone>;
+  backdropPollIntervalMs?: number;
 }
 
 function remainingPercent(usedPercent: number) {
@@ -93,7 +95,8 @@ export default function App({
   loadAppVersion = getVersion,
   authorizeUsage = enableUsage,
   resizeView = resizeWindowForView,
-  detectDarkBackdrop = backgroundIsDark,
+  detectBackdrop = getBackdropTone,
+  backdropPollIntervalMs = 350,
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
@@ -107,30 +110,49 @@ export default function App({
     notifyReset: false,
   });
   const [autostart, setAutostartValue] = useState(false);
-  const [appVersion, setAppVersion] = useState("1.1.3");
+  const [appVersion, setAppVersion] = useState("1.1.4");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
   const preferencesRef = useRef(defaultWindowPreferences);
   const preferenceSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
-  const [darkBackdrop, setDarkBackdrop] = useState(false);
+  const [backdropTone, setBackdropTone] = useState<BackdropTone>("light");
 
   useEffect(() => {
     let active = true;
+    let detecting = false;
+    let lastCandidate: BackdropTone | undefined;
+    let matchingSamples = 0;
     const detect = () => {
-      void detectDarkBackdrop()
-        .then((dark) => {
-          if (active) setDarkBackdrop(dark);
+      if (detecting || document.hidden) return;
+      detecting = true;
+      void detectBackdrop()
+        .then((next) => {
+          if (!active) return;
+          if (next === lastCandidate) matchingSamples += 1;
+          else {
+            lastCandidate = next;
+            matchingSamples = 1;
+          }
+          if (matchingSamples >= 2) setBackdropTone(next);
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .finally(() => {
+          detecting = false;
+        });
     };
     detect();
-    const timer = window.setInterval(detect, 2_000);
+    const timer = window.setInterval(detect, backdropPollIntervalMs);
+    const detectWhenVisible = () => {
+      if (!document.hidden) detect();
+    };
+    document.addEventListener("visibilitychange", detectWhenVisible);
     return () => {
       active = false;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", detectWhenVisible);
     };
-  }, [detectDarkBackdrop]);
+  }, [backdropPollIntervalMs, detectBackdrop]);
 
   useEffect(() => {
     void loadUsage().then(setView);
@@ -227,7 +249,7 @@ export default function App({
   );
 
   const compact = preferences.mode === "compact" && screen === "meter";
-  const textToneClass = darkBackdrop ? "text-tone-light" : "text-tone-dark";
+  const textToneClass = `backdrop-${backdropTone}`;
   const platformClass = navigator.userAgent.includes("Windows") ? "platform-windows" : "";
   const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
 
