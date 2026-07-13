@@ -1,0 +1,52 @@
+name: Publish macOS release history
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Create releases and upload DMGs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          versions=(1.0.0 1.1.0 1.1.1 1.1.2 1.1.3)
+          targets=(
+            1332a9865ddc7ca94b22a2f91e1fffa6004bb54d
+            8cad25d08147f71ad591e204f0b257db41b8cb94
+            98282dac26d08ff61235a31e414e6b10a5060d5a
+            dc308a555e8d014b6d91c1d93fa2ee79376a0deb
+            3743c454b95902daaccec7b0b17c55bdc2f61fec
+          )
+
+          for index in "${!versions[@]}"; do
+            version="${versions[$index]}"
+            tag="v${version}"
+            notes="docs/release-notes-v${version}.md"
+            dmg="outputs/TokenUsage_${version}_arm64.dmg"
+
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release edit "$tag" \
+                --title "Token用量 ${tag}" \
+                --notes-file "$notes"
+            else
+              gh release create "$tag" \
+                --target "${targets[$index]}" \
+                --title "Token用量 ${tag}" \
+                --notes-file "$notes"
+            fi
+
+            gh release upload "$tag" "$dmg" --clobber
+          done
+
+          gh release edit v1.1.3 --latest

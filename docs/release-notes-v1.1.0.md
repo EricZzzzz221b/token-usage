@@ -15,3 +15,9 @@
 
 - Apple Silicon Mac
 - macOS 13 或更高版本
+
+## 安装包
+
+`TokenUsage_1.1.0_arm64.dmg`
+
+SHA-256：`f29e57ee6db092f225fc3197f99016501cee147a87abc458727dd56b9f0454eb`

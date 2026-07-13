@@ -1,56 +1,84 @@
-# Token用量 / Token Usage
+<p align="center">
+  <img src="assets/app-icon.png" width="112" alt="Token用量图标">
+</p>
 
-Token用量是一款面向 Codex 官方订阅用户的跨平台桌面用量工具。它只读本机 Codex OAuth 登录态，向 `chatgpt.com` 官方用量接口查询数据，并以倒扣方式展示 5 小时和 7 天窗口的剩余额度与重置时间（满额 100%，用尽 0%）。
+<h1 align="center">Token用量</h1>
 
-当前发布线：Windows v1.0.0；macOS v1.1.3。两个平台使用独立 Tauri 配置，Windows 版本号不会覆盖 macOS 发布线。
+<p align="center">在 Windows 系统托盘、macOS 状态栏和桌面浮窗中查看 Codex 订阅剩余额度。</p>
 
-## Windows v1.0.0
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0">
+  <img src="https://img.shields.io/badge/macOS-v1.1.3-111111?logo=apple" alt="macOS v1.1.3"><br>
+  <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2">
+</p>
 
-- [下载 MSI（Windows x64）](outputs/TokenUsage_Windows_1.0.0_x64.msi)
-- [下载 EXE/NSIS 安装器（Windows x64）](outputs/TokenUsage_Windows_1.0.0_x64-setup.exe)
-- [查看 Windows v1.0.0 更新说明](docs/release-notes-windows-v1.0.0.md)
-- [查看 SHA-256](outputs/SHA256SUMS-Windows-1.0.0.txt)
+<p align="center">
+  <a href="#下载与安装"><strong>下载</strong></a>
+  · <a href="CHANGELOG.md">更新记录</a>
+  · <a href="README_EN.md">English</a>
+</p>
 
-支持 Windows 11 x64 和 Windows 10 22H2 x64。v1.0.0 暂不发布 ARM64：当前发布流程只在 GitHub Actions 的 Windows x64 运行器上完成真实安装包验证，ARM64 将在具备对应运行环境后再启用。
-
-安装：
-
-1. 优先下载并运行 `.msi`；也可以使用 `-setup.exe`。
-2. 本版本没有商业代码签名证书。若 Microsoft Defender SmartScreen 显示警告，请核对本页 SHA-256，然后选择“更多信息”→“仍要运行”。不要在哈希不一致时继续。
-3. 安装器内嵌 Microsoft WebView2 Bootstrapper。如果系统没有 WebView2 Runtime，安装器会明确启动 Microsoft 安装流程，因此首次安装可能需要联网；Windows 10 22H2 和 Windows 11 通常已包含 WebView2。
-4. 启动 Codex CLI 或客户端并使用 ChatGPT OAuth 登录。应用支持默认 `%USERPROFILE%\.codex\auth.json` 和 `CODEX_HOME\auth.json`。
-
-卸载：打开“设置”→“应用”→“已安装的应用”，找到“Token用量”并选择“卸载”。安装器提供开始菜单入口、覆盖升级和标准卸载项。
-
-## macOS v1.1.3
-
-- [下载 macOS DMG（Apple Silicon）](outputs/TokenUsage_1.1.3_arm64.dmg)
-- [查看 v1.1.3 更新说明](outputs/TokenUsage_1.1.3_ReleaseNotes.md)
-- SHA-256：`3c3bc199fadf9fb965e7675ed7cf0c4e12dedc0507c661b172dc54fae7411d0e`
-
-要求 Apple Silicon Mac 和 macOS 13 或更高版本。DMG 采用 ad-hoc 签名，首次启动请在 Finder 中右键应用并选择“打开”。macOS v1.1.3 的 Liquid Glass、壁纸明暗对比度检测和既有功能保持不变。
+Token用量是一款轻量的跨平台桌面工具。它只读本机 Codex OAuth 登录态，显示 5 小时和 7 天窗口的剩余额度与重置时间，并可在余额较低时发送通知。Windows v1.0.0 与 macOS v1.1.3 使用独立 Tauri 版本配置，两个发布线互不覆盖。
 
 ## 功能
 
-- 标准/紧凑浮窗与快捷切换
-- 5 小时、7 天剩余额度和重置时间
-- 立即刷新、自动刷新间隔、阈值与重置通知
-- 托盘显示周期选择、显示浮窗、切换模式、刷新和退出
-- 开机启动、始终置顶、锁定位置、鼠标穿透和窗口拖动
-- 中文和英文界面
-- Windows 11 Mica、Windows 10 Acrylic 与稳定纯色降级
-- 深色/浅色主题自动适配和 Windows 高对比度模式基础支持
+- 以“满额 100%，用尽 0%”的方式显示剩余额度
+- 系统托盘/状态栏可选择显示 5 小时或 7 天窗口
+- 标准和紧凑两种浮窗，可从浮窗或托盘快速切换
+- 立即刷新、自动刷新间隔、余额阈值和额度重置通知
+- 始终置顶、锁定位置、鼠标穿透、窗口拖动和登录时启动
+- Windows 11 Mica、Windows 10 Acrylic 与清晰的纯色回退
+- 自动深色/浅色对比度、Windows 高对比度基础支持
+- 简体中文和英文界面
 
-## 安全与隐私
+## 预览
 
-- OAuth 凭据只在本机内存中读取，不持久化、不记录、不上传 Access Token、Refresh Token、Account ID、邮箱或原始认证内容。
-- 凭据只用于请求 `https://chatgpt.com/backend-api/wham/usage`。
-- Windows v1.0.0 不读取 Windows Credential Manager；目前没有经过验证的 Codex 凭据格式，因此不会猜测实现。
-- 本地历史只保存标准化后的用量窗口，设置和缓存使用 Tauri 提供的系统标准目录（Windows 为 AppData）。
+<p align="center">
+  <img src="assets/screenshot-detailed.png" width="360" alt="Token用量标准模式">
+</p>
 
-## 开发与文档
+<p align="center">
+  <img src="assets/screenshot-compact.png" width="320" alt="Token用量紧凑模式">
+</p>
 
-要求 Node.js 22 LTS 和 Rust stable。
+<details>
+  <summary>查看设置界面</summary>
+  <p align="center"><img src="assets/screenshot-settings.png" width="420" alt="Token用量设置界面"></p>
+</details>
+
+## 下载与安装
+
+| 平台                             | 状态      | 版本与下载                                                                                                                                                |
+| -------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows 11 / Windows 10 22H2 x64 | CI 验证中 | [MSI](outputs/TokenUsage_Windows_1.0.0_x64.msi) · [EXE](outputs/TokenUsage_Windows_1.0.0_x64-setup.exe) · [SHA-256](outputs/SHA256SUMS-Windows-1.0.0.txt) |
+| macOS 13+ Apple Silicon          | 可下载    | [v1.1.3 DMG](outputs/TokenUsage_1.1.3_arm64.dmg) · [更新说明](outputs/TokenUsage_1.1.3_ReleaseNotes.md)                                                   |
+
+### Windows v1.0.0
+
+v1.0.0 首发仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与运行验证。
+
+1. 优先下载并运行 `.msi`，也可以使用 `-setup.exe`。
+2. 本版本没有商业代码签名证书。若 SmartScreen 显示警告，请先核对 [SHA-256](outputs/SHA256SUMS-Windows-1.0.0.txt)，再选择“更多信息”→“仍要运行”。哈希不一致时不要继续。
+3. 安装器内嵌 WebView2 Bootstrapper。系统缺少 Runtime 时会启动 Microsoft 安装流程，因此首次安装可能需要联网；Windows 10 22H2 和 Windows 11 通常已包含 WebView2。
+4. 使用 ChatGPT OAuth 登录 Codex CLI 或客户端。应用支持 `%USERPROFILE%\.codex\auth.json` 与 `CODEX_HOME\auth.json`。
+
+卸载：打开“设置”→“应用”→“已安装的应用”，找到“Token用量”并选择“卸载”。完整说明见 [Windows v1.0.0 更新说明](docs/release-notes-windows-v1.0.0.md)。
+
+### macOS v1.1.3
+
+下载 DMG 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。macOS v1.1.3 的 Liquid Glass、壁纸明暗检测和既有功能保持不变。
+
+## 隐私
+
+- OAuth 凭据只在本机内存中读取，只用于请求 `https://chatgpt.com/backend-api/wham/usage`。
+- 不保存、记录或上传 Access Token、Refresh Token、邮箱、Account ID 或原始认证内容。
+- Windows v1.0.0 不读取 Credential Manager：目前没有经过验证的 Codex 凭据格式，因此不会猜测实现。
+- 本地历史只包含标准化用量，设置和缓存使用 Tauri 系统目录（Windows 为 AppData）。
+- 应用不包含遥测和行为追踪。
+
+## 本地开发
+
+需要 Node.js 22 和 Rust stable；macOS 另需 Xcode Command Line Tools，Windows 另需 Visual Studio 2022 Build Tools。
 
 ```bash
 npm ci
@@ -63,4 +91,4 @@ npm run tauri:dev
 - [技术架构](docs/architecture.md)
 - [贡献指南](CONTRIBUTING.md)
 
-Windows 安装包由 `windows-latest` GitHub Actions 运行器实际构建。`Release Windows` 手动工作流使用独立标签 `windows-v1.0.0`，不会影响 macOS v1.1.3 标签和版本配置。
+Windows 安装包由 `windows-latest` Actions 真实构建；`Release Windows` 使用独立标签 `windows-v1.0.0`。本项目与 OpenAI 没有官方关联。
