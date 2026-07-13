@@ -7,10 +7,9 @@
 <p align="center">Check your remaining Codex subscription quota from the macOS menu bar and a small desktop widget.</p>
 
 <p align="center">
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=release" alt="Latest release"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/badge/release-v1.1.3-2ea44f" alt="Latest release v1.1.3"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+"><br>
   <img src="https://img.shields.io/badge/Apple%20Silicon-M1%20or%20newer-555555" alt="Apple Silicon">
-  <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2">
 </p>
 
 <p align="center">
@@ -77,6 +76,8 @@ Windows v1.0.0 is in development and will be published on the Releases page when
 ## Development
 
 Node.js 22, Rust stable, and Xcode Command Line Tools are required.
+
+The app is built with Tauri 2, React, and TypeScript. Tauri is an open-source framework for building lightweight desktop apps with web technologies.
 
 ```bash
 npm install

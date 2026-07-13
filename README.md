@@ -7,6 +7,7 @@
 <p align="center">在 Windows 系统托盘、macOS 状态栏和桌面浮窗中查看 Codex 订阅剩余额度。</p>
 
 <p align="center">
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/badge/最新版-v1.1.3-2ea44f" alt="最新版本 v1.1.3"></a>
   <img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0">
   <img src="https://img.shields.io/badge/macOS-v1.1.3-111111?logo=apple" alt="macOS v1.1.3"><br>
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2">
@@ -79,6 +80,8 @@ v1.0.0 首发仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与运
 ## 本地开发
 
 需要 Node.js 22 和 Rust stable；macOS 另需 Xcode Command Line Tools，Windows 另需 Visual Studio 2022 Build Tools。
+
+应用使用 Tauri 2、React 和 TypeScript 开发。Tauri 是一个使用网页技术制作轻量桌面应用的开源框架。
 
 ```bash
 npm ci

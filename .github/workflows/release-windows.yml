@@ -1,6 +1,9 @@
 name: Release Windows
 
 on:
+  push:
+    tags:
+      - "windows-v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -45,11 +48,12 @@ jobs:
           Get-FileHash outputs/TokenUsage_Windows_1.0.0_x64-setup.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  TokenUsage_Windows_1.0.0_x64-setup.exe" } | Add-Content outputs/SHA256SUMS-Windows-1.0.0.txt
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
+          tag_name: ${{ inputs.tag || github.ref_name }}
           name: Token用量 Windows v1.0.0
           body_path: docs/release-notes-windows-v1.0.0.md
           draft: false
           prerelease: false
+          make_latest: false
           files: |
             outputs/TokenUsage_Windows_1.0.0_x64.msi
             outputs/TokenUsage_Windows_1.0.0_x64-setup.exe
