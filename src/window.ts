@@ -2,8 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type WindowMode = "compact" | "detailed";
+export type TextTone = "automatic" | "dark" | "light";
 export interface WindowPreferences {
   mode: WindowMode;
+  textTone: TextTone;
   alwaysOnTop: boolean;
   locked: boolean;
   clickThrough: boolean;
