@@ -128,17 +128,17 @@ pub fn apply_glass(app: &AppHandle, glass_level: f64) -> Result<(), UsageError> 
     apply_glass_with_radius(app, glass_level, radius)
 }
 
-pub fn background_is_dark(app: &AppHandle) -> Result<bool, UsageError> {
+pub fn backdrop_is_dark(app: &AppHandle) -> Result<bool, UsageError> {
     let window = main_window(app)?;
     #[cfg(target_os = "macos")]
     {
         unsafe extern "C" {
-            fn token_usage_background_is_dark(view_pointer: *mut std::ffi::c_void) -> bool;
+            fn token_usage_backdrop_is_dark(view_pointer: *mut std::ffi::c_void) -> bool;
         }
         let ns_view = window
             .ns_view()
             .map_err(|_| UsageError::WindowUnavailable)?;
-        Ok(unsafe { token_usage_background_is_dark(ns_view) })
+        Ok(unsafe { token_usage_backdrop_is_dark(ns_view) })
     }
     #[cfg(not(target_os = "macos"))]
     {

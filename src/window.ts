@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type WindowMode = "compact" | "detailed";
+export type BackdropTone = "light" | "dark";
 export interface WindowPreferences {
   mode: WindowMode;
   alwaysOnTop: boolean;
@@ -10,8 +11,9 @@ export interface WindowPreferences {
   glassLevel: number;
 }
 
-export function backgroundIsDark(): Promise<boolean> {
-  return invoke<boolean>("background_is_dark");
+export async function getBackdropTone(): Promise<BackdropTone> {
+  const dark = await invoke<boolean>("backdrop_is_dark");
+  return dark ? "dark" : "light";
 }
 
 export function getWindowPreferences(): Promise<WindowPreferences> {
