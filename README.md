@@ -1,99 +1,103 @@
-# Token用量 / Token Usage
+<p align="center">
+  <img src="assets/app-icon.png" width="112" alt="Token用量图标">
+</p>
 
-Token用量是一款面向 Codex 官方订阅用户的 macOS 状态栏工具。它复用本机 Codex OAuth 登录态，以倒扣方式展示多个订阅周期的剩余额度与重置时间（满额 100%，用尽 0%），并提供液态玻璃风格的桌面浮窗和系统通知。
+<h1 align="center">Token用量</h1>
 
-> 当前状态：v1.1.3。核心功能、通知、系统集成和本地发布物均已完成；公开发布仍需 Apple Developer 签名与公证凭据。
+<p align="center">在 macOS 状态栏和桌面浮窗中查看 Codex 订阅剩余额度。</p>
+
+<p align="center">
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=最新版" alt="最新版本"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+"><br>
+  <img src="https://img.shields.io/badge/Apple%20Silicon-M1%20及以上-555555" alt="Apple Silicon">
+  <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2">
+</p>
+
+<p align="center">
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><strong>下载最新版</strong></a>
+  · <a href="CHANGELOG.md">更新记录</a>
+  · <a href="README_EN.md">English</a>
+</p>
+
+Token用量是一款轻量的 macOS 小工具。它读取本机 Codex 的登录状态，显示 5 小时和 7 天窗口的剩余额度、重置时间，并可在额度较低时发送通知。
+
+## 功能
+
+- 以“满额 100%，用尽 0%”的方式显示剩余额度
+- 在状态栏选择显示 5 小时或 7 天窗口
+- 标准和紧凑两种桌面浮窗
+- 快速刷新、自定义刷新间隔和余额提醒
+- 始终置顶、锁定位置、鼠标穿透和登录时启动
+- 根据桌面背景自动切换文字明暗
+- 简体中文和英文界面
+
+## 预览
+
+<p align="center">
+  <img src="assets/screenshot-detailed.png" width="360" alt="Token用量标准模式">
+</p>
+
+<p align="center">
+  <img src="assets/screenshot-compact.png" width="320" alt="Token用量紧凑模式">
+</p>
+
+<details>
+  <summary>查看设置界面</summary>
+  <p align="center"><img src="assets/screenshot-settings.png" width="420" alt="Token用量设置界面"></p>
+</details>
 
 ## 下载与安装
 
-### Token用量 v1.1.3
+| 平台                   | 状态   | 版本   |
+| ---------------------- | ------ | ------ |
+| macOS（Apple Silicon） | 可下载 | v1.1.3 |
+| Windows                | 开发中 | v1.0.0 |
 
-- [下载 macOS DMG（Apple Silicon）](outputs/TokenUsage_1.1.3_arm64.dmg)
-- [查看 v1.1.3 更新说明](outputs/TokenUsage_1.1.3_ReleaseNotes.md)
-- 文件大小：约 4.6 MB
-- SHA-256：`3c3bc199fadf9fb965e7675ed7cf0c4e12dedc0507c661b172dc54fae7411d0e`
+macOS 版本要求 macOS 13 或更高版本，并需要已经通过 ChatGPT OAuth 登录 Codex 客户端或 CLI。
 
-系统要求：
+1. 前往 [Releases](https://github.com/EricZzzzz221b/token-usage/releases/latest) 下载最新的 `.dmg`。
+2. 打开 DMG，将 `Token用量.app` 拖入 `Applications`。
+3. 当前安装包尚未经过 Apple 公证。首次启动时，请在 Finder 中右键应用，选择“打开”，然后再次确认。
 
-- Apple Silicon Mac（M1、M2、M3、M4、M5）
-- macOS 13 或更高版本
-- 已使用 ChatGPT OAuth 登录 Codex 官方客户端或 CLI
+Windows v1.0.0 正在开发，完成后也会在 Releases 页面提供下载。
 
-安装步骤：
+## 使用
 
-1. 下载并双击打开 DMG。
-2. 将 `Token用量.app` 拖入 `Applications`。
-3. 首次启动时，在 Finder 中右键 `Token用量.app` 并选择“打开”。
-4. 在 macOS 确认窗口中再次选择“打开”。
+- 点击状态栏图标显示或隐藏浮窗。
+- 在浮窗右上角快速切换标准和紧凑模式。
+- 在设置中选择状态栏显示 5 小时还是 7 天剩余额度。
+- 如果开启了鼠标穿透，可通过状态栏菜单关闭。
 
-当前下载包采用 ad-hoc 签名，尚未使用 Apple Developer ID 进行公证，因此首次启动不能直接双击。应用只读取本机 Codex/ChatGPT OAuth 登录状态，并仅向 `chatgpt.com` 官方用量接口发起请求。
+## 隐私
 
-v1.1.3 会根据浮窗当前位置背后的桌面壁纸明暗自动选择深色或浅色文字。移动浮窗后会自动更新，不需要手动设置，也不需要屏幕录制权限。
+- OAuth 凭据只在本机读取。
+- 凭据只用于请求 Codex 官方用量接口。
+- 应用不会保存、记录或上传 Access Token、Refresh Token、邮箱或账号 ID。
+- 应用不包含遥测和行为追踪。
 
-### v1.1 额度显示规则
+## 当前范围
 
-- 满额度显示为 100%。
-- 使用后剩余额度逐步下降。
-- 额度用尽显示为 0%，并使用红色风险状态。
-- 剩余 30% 及以下显示黄色，剩余 10% 及以下显示红色。
-- 浮窗、进度条、状态栏和通知全部使用相同的剩余额度逻辑。
-
-## 产品范围
-
-- 仅支持 macOS 首发版本
-- 仅支持 Codex 官方 ChatGPT OAuth 订阅
-- 状态栏常驻，桌面浮窗可选
-- 支持多周期进度条、重置倒计时和阈值通知
-- 默认每 5 分钟刷新，允许自定义刷新间隔
-- 不支持 API Key 余额、第三方中转、多账号切换或请求代理
-
-## 文档
-
-- [产品规格](docs/product-spec.md)
-- [技术设计](docs/architecture.md)
-- [开发路线](docs/roadmap.md)
-- [开发计划](docs/development-plan.md)
-- [开发约定](CONTRIBUTING.md)
-
-## 暂定技术栈
-
-- Tauri 2
-- Rust
-- React + TypeScript
-- macOS Menu Bar 与透明置顶窗口
-- macOS Keychain 与 `~/.codex/auth.json` 只读凭据发现
+- macOS 版本目前仅支持 Apple Silicon。
+- 仅支持 Codex 官方 ChatGPT OAuth 订阅。
+- 不支持 API Key 余额、第三方中转或多账号切换。
 
 ## 本地开发
 
-要求 Node.js 22 LTS、Rust stable 和 Xcode Command Line Tools。
+需要 Node.js 22、Rust stable 和 Xcode Command Line Tools。
 
 ```bash
 npm install
 npm run tauri:dev
 ```
 
-常用检查：
+完整检查：
 
 ```bash
 npm run check
-npm run tauri:build
 ```
 
-生成本机可安装的 ad-hoc `.app` 与 `.dmg`：
+## 反馈
 
-```bash
-npm run tauri -- build --bundles app
-./scripts/build-dmg.sh
-```
+如果遇到问题或有功能建议，可以提交 [Issue](https://github.com/EricZzzzz221b/token-usage/issues)。
 
-GitHub 的 `Release macOS` 手动工作流会创建草稿 Release。签名及公证需要在仓库 Secrets 中配置 `APPLE_CERTIFICATE`、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_SIGNING_IDENTITY`、`APPLE_ID`、`APPLE_PASSWORD` 和 `APPLE_TEAM_ID`。
-
-阶段 0 的架构决策记录位于 [`docs/adr`](docs/adr)。
-
-## 安全原则
-
-- OAuth 凭据只在本机读取
-- 凭据只用于请求 `https://chatgpt.com/backend-api/wham/usage`
-- 不持久化、不记录、不上传 Access Token 或 Refresh Token
-- 日志和诊断信息必须经过敏感字段脱敏
-- 本地历史仅保存标准化后的用量窗口，不包含 Token、Account ID、邮箱或原始响应
+这是一个个人项目，与 OpenAI 没有官方关联。
