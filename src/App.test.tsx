@@ -19,6 +19,7 @@ const ready = {
 };
 const windowPreferences = {
   mode: "detailed" as const,
+  textTone: "automatic" as const,
   alwaysOnTop: true,
   locked: false,
   clickThrough: false,
@@ -115,6 +116,23 @@ describe("App", () => {
         expect.objectContaining({ mode: "compact" }),
       ),
     );
+  });
+
+  it("applies and saves a manual light text override", async () => {
+    const saveWindowPreferences = vi.fn(async (preferences: WindowPreferences) => preferences);
+    render(<App {...defaults} saveWindowPreferences={saveWindowPreferences} />);
+    await screen.findAllByRole("progressbar");
+    fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
+    fireEvent.change(screen.getByLabelText(/文字颜色|Text color/), {
+      target: { value: "light" },
+    });
+
+    await waitFor(() =>
+      expect(saveWindowPreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ textTone: "light" }),
+      ),
+    );
+    expect(document.querySelector("main")).toHaveClass("text-tone-light");
   });
 
   it("switches directly from compact to standard mode", async () => {

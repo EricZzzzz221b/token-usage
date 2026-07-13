@@ -24,6 +24,7 @@ import {
 
 const defaultWindowPreferences: WindowPreferences = {
   mode: "detailed",
+  textTone: "automatic",
   alwaysOnTop: true,
   locked: false,
   clickThrough: false,
@@ -101,7 +102,7 @@ export default function App({
     notifyReset: false,
   });
   const [autostart, setAutostartValue] = useState(false);
-  const [appVersion, setAppVersion] = useState("1.1.1");
+  const [appVersion, setAppVersion] = useState("1.1.2");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
@@ -197,6 +198,8 @@ export default function App({
   );
 
   const compact = preferences.mode === "compact" && screen === "meter";
+  const textToneClass =
+    preferences.textTone === "automatic" ? "" : `text-tone-${preferences.textTone}`;
   const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
 
   const openSettings = () => {
@@ -220,7 +223,7 @@ export default function App({
 
   if (compact) {
     return (
-      <main className="app-shell compact-shell">
+      <main className={`app-shell compact-shell ${textToneClass}`}>
         <section className="liquid-panel compact-panel" onMouseDown={drag}>
           <strong className="brand-word">Codex</strong>
           {!settings.usageEnabled ? (
@@ -277,7 +280,9 @@ export default function App({
   }
 
   return (
-    <main className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"}`}>
+    <main
+      className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"} ${textToneClass}`}
+    >
       <section className="liquid-panel">
         <header className="titlebar" onMouseDown={drag}>
           <h1>{screen === "settings" ? t("settingsTitle") : t("meterTitle")}</h1>
@@ -327,6 +332,20 @@ export default function App({
                 options={[
                   ["compact", t("compact")],
                   ["detailed", t("detailed")],
+                ]}
+              />
+              <SelectRow
+                label={t("textTone")}
+                value={preferences.textTone}
+                onChange={(value) =>
+                  void updatePreferences({
+                    textTone: value as WindowPreferences["textTone"],
+                  })
+                }
+                options={[
+                  ["automatic", t("textToneAutomatic")],
+                  ["dark", t("textToneDark")],
+                  ["light", t("textToneLight")],
                 ]}
               />
               <label className="setting-row glass-level-row">

@@ -2,16 +2,16 @@
 
 Token用量是一款面向 Codex 官方订阅用户的 macOS 状态栏工具。它复用本机 Codex OAuth 登录态，以倒扣方式展示多个订阅周期的剩余额度与重置时间（满额 100%，用尽 0%），并提供液态玻璃风格的桌面浮窗和系统通知。
 
-> 当前状态：v1.1.1。核心功能、通知、系统集成和本地发布物均已完成；公开发布仍需 Apple Developer 签名与公证凭据。
+> 当前状态：v1.1.2。核心功能、通知、系统集成和本地发布物均已完成；公开发布仍需 Apple Developer 签名与公证凭据。
 
 ## 下载与安装
 
-### Token用量 v1.1.1
+### Token用量 v1.1.2
 
-- [下载 macOS DMG（Apple Silicon）](outputs/TokenUsage_1.1.1_arm64.dmg)
-- [查看 v1.1.1 更新说明](outputs/TokenUsage_1.1.1_ReleaseNotes.md)
+- [下载 macOS DMG（Apple Silicon）](outputs/TokenUsage_1.1.2_arm64.dmg)
+- [查看 v1.1.2 更新说明](outputs/TokenUsage_1.1.2_ReleaseNotes.md)
 - 文件大小：约 4.6 MB
-- SHA-256：`2fea8a26ec992856752ffd4e262fb48a395279f65379b643f9b3a59a7c1b2f1b`
+- SHA-256：`e2f828a454af748eeba73f3d09010d1a5eba30ca9298c482cadfd10d3553eee2`
 
 系统要求：
 

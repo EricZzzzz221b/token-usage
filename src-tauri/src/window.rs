@@ -12,10 +12,21 @@ pub enum WindowMode {
     Detailed,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextTone {
+    #[default]
+    Automatic,
+    Dark,
+    Light,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowPreferences {
     pub mode: WindowMode,
+    #[serde(default)]
+    pub text_tone: TextTone,
     pub always_on_top: bool,
     pub locked: bool,
     pub click_through: bool,
@@ -31,6 +42,7 @@ impl Default for WindowPreferences {
     fn default() -> Self {
         Self {
             mode: WindowMode::Detailed,
+            text_tone: TextTone::Automatic,
             always_on_top: true,
             locked: false,
             click_through: false,
@@ -214,5 +226,6 @@ mod tests {
         )
         .expect("deserialize legacy preferences");
         assert_eq!(decoded.glass_level, 0.5);
+        assert_eq!(decoded.text_tone, TextTone::Automatic);
     }
 }
