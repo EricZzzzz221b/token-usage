@@ -28,7 +28,7 @@
         "type": "embedBootstrapper"
       },
       "wix": {
-        "language": ["zh-CN", "en-US"]
+        "language": "zh-CN"
       },
       "nsis": {
         "installMode": "currentUser",
