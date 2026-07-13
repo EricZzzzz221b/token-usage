@@ -7,7 +7,7 @@
 <p align="center">Check your remaining Codex subscription quota from the Windows system tray, macOS menu bar, and a small desktop widget.</p>
 
 <p align="center">
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=release" alt="Latest release"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=release&amp;cacheSeconds=300" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0">
   <img src="https://img.shields.io/badge/macOS-v1.1.3-111111?logo=apple" alt="macOS v1.1.3"><br>
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2">
