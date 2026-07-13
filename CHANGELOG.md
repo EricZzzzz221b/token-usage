@@ -1,5 +1,12 @@
 # 更新记录
 
+## Windows v1.0.0 · 2026-07-13
+
+- 首个 Windows 正式版本，支持 Windows 11 x64 和 Windows 10 22H2 x64。
+- 提供 MSI 和 EXE 两种安装包，并附带 SHA-256 校验文件。
+- 支持系统托盘、标准/紧凑浮窗、Mica/Acrylic、自动刷新、通知和窗口设置。
+- 安装包和完整说明已发布到 [Windows v1.0.0 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0)。
+
 ## v1.1.3 · 2026-07-13
 
 - 根据浮窗所在位置的桌面壁纸自动选择深色或浅色文字。
