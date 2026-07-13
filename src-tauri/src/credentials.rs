@@ -31,6 +31,7 @@ pub enum CredentialStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CredentialSource {
+    #[cfg(target_os = "macos")]
     Keychain,
     File,
     None,
