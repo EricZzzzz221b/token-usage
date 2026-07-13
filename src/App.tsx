@@ -13,6 +13,7 @@ import {
 } from "./usage";
 import { enableUsage, ensureNotificationPermission, getAutostart, setAutostart } from "./system";
 import {
+  backgroundIsDark,
   getWindowPreferences,
   onWindowModeChanged,
   onWindowPreferences,
@@ -24,7 +25,6 @@ import {
 
 const defaultWindowPreferences: WindowPreferences = {
   mode: "detailed",
-  textTone: "automatic",
   alwaysOnTop: true,
   locked: false,
   clickThrough: false,
@@ -52,6 +52,7 @@ interface AppProps {
   loadAppVersion?: () => Promise<string>;
   authorizeUsage?: () => Promise<UsageView>;
   resizeView?: (view: "compact" | "detailed" | "settings") => Promise<void>;
+  detectDarkBackdrop?: () => Promise<boolean>;
 }
 
 function remainingPercent(usedPercent: number) {
@@ -89,6 +90,7 @@ export default function App({
   loadAppVersion = getVersion,
   authorizeUsage = enableUsage,
   resizeView = resizeWindowForView,
+  detectDarkBackdrop = backgroundIsDark,
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
@@ -102,12 +104,30 @@ export default function App({
     notifyReset: false,
   });
   const [autostart, setAutostartValue] = useState(false);
-  const [appVersion, setAppVersion] = useState("1.1.2");
+  const [appVersion, setAppVersion] = useState("1.1.3");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
   const preferencesRef = useRef(defaultWindowPreferences);
   const preferenceSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const [darkBackdrop, setDarkBackdrop] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const detect = () => {
+      void detectDarkBackdrop()
+        .then((dark) => {
+          if (active) setDarkBackdrop(dark);
+        })
+        .catch(() => undefined);
+    };
+    detect();
+    const timer = window.setInterval(detect, 2_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [detectDarkBackdrop]);
 
   useEffect(() => {
     void loadUsage().then(setView);
@@ -198,8 +218,7 @@ export default function App({
   );
 
   const compact = preferences.mode === "compact" && screen === "meter";
-  const textToneClass =
-    preferences.textTone === "automatic" ? "" : `text-tone-${preferences.textTone}`;
+  const textToneClass = darkBackdrop ? "text-tone-light" : "text-tone-dark";
   const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
 
   const openSettings = () => {
@@ -332,20 +351,6 @@ export default function App({
                 options={[
                   ["compact", t("compact")],
                   ["detailed", t("detailed")],
-                ]}
-              />
-              <SelectRow
-                label={t("textTone")}
-                value={preferences.textTone}
-                onChange={(value) =>
-                  void updatePreferences({
-                    textTone: value as WindowPreferences["textTone"],
-                  })
-                }
-                options={[
-                  ["automatic", t("textToneAutomatic")],
-                  ["dark", t("textToneDark")],
-                  ["light", t("textToneLight")],
                 ]}
               />
               <label className="setting-row glass-level-row">
