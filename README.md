@@ -49,10 +49,10 @@ Token用量是一款轻量的跨平台桌面工具。它只读本机 Codex OAuth
 
 ## 下载与安装
 
-| 平台                             | 状态      | 版本与下载                                                                                                                                                |
-| -------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows 11 / Windows 10 22H2 x64 | CI 验证中 | [MSI](outputs/TokenUsage_Windows_1.0.0_x64.msi) · [EXE](outputs/TokenUsage_Windows_1.0.0_x64-setup.exe) · [SHA-256](outputs/SHA256SUMS-Windows-1.0.0.txt) |
-| macOS 13+ Apple Silicon          | 可下载    | [v1.1.3 DMG](outputs/TokenUsage_1.1.3_arm64.dmg) · [更新说明](outputs/TokenUsage_1.1.3_ReleaseNotes.md)                                                   |
+| 平台                             | 状态   | 版本与下载                                                                                                                                                |
+| -------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows 11 / Windows 10 22H2 x64 | 可下载 | [MSI](outputs/TokenUsage_Windows_1.0.0_x64.msi) · [EXE](outputs/TokenUsage_Windows_1.0.0_x64-setup.exe) · [SHA-256](outputs/SHA256SUMS-Windows-1.0.0.txt) |
+| macOS 13+ Apple Silicon          | 可下载 | [v1.1.3 DMG](outputs/TokenUsage_1.1.3_arm64.dmg) · [更新说明](outputs/TokenUsage_1.1.3_ReleaseNotes.md)                                                   |
 
 ### Windows v1.0.0
 

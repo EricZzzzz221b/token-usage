@@ -1,0 +1,2 @@
+30d27e751e80dadb9846e442e363c8c1be3eaaf1b521a17204b1d719f02fdc9b  TokenUsage_Windows_1.0.0_x64.msi
+1e390f9c23c875555de9e8baa6745c66052cef17236e2ad6c4fb1afc52c3c7df  TokenUsage_Windows_1.0.0_x64-setup.exe
