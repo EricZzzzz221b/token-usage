@@ -27,7 +27,13 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
       - run: npm ci
-      - run: npm run check
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --all-targets -- -D warnings
       - run: npm run tauri -- build --target x86_64-pc-windows-msvc --bundles msi,nsis
       - name: Normalize release filenames and checksums
         shell: pwsh

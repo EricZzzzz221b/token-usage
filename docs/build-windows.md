@@ -29,6 +29,8 @@ npm run tauri -- build --target x86_64-pc-windows-msvc --bundles msi,nsis
 
 `tauri.windows.conf.json` 会在 Windows 目标上自动与主配置合并，把应用版本覆盖为 1.0.0 并把 bundle 目标改为 MSI 和 NSIS。主配置和 Cargo/package 版本继续保持 macOS v1.1.3。
 
+Tauri 要求 `macOSPrivateApi` 配置与其 Cargo feature 在主 manifest 中一致；该 feature 自身由 Tauri 在 Windows 上条件编译为空。项目自己的 Objective-C、AppKit、QuartzCore、`ns_view` 和 Liquid Glass 调用仍全部受 `target_os = "macos"` 保护，Windows 构建脚本不会读取或编译 `native/liquid_glass.m`。
+
 ## CI 与发布
 
 - `CI / windows-x64` 在每个 PR 和 main push 上运行完整前端、Rust、Clippy 和安装器构建。
