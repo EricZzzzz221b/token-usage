@@ -12,21 +12,10 @@ pub enum WindowMode {
     Detailed,
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TextTone {
-    #[default]
-    Automatic,
-    Dark,
-    Light,
-}
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WindowPreferences {
     pub mode: WindowMode,
-    #[serde(default)]
-    pub text_tone: TextTone,
     pub always_on_top: bool,
     pub locked: bool,
     pub click_through: bool,
@@ -42,7 +31,6 @@ impl Default for WindowPreferences {
     fn default() -> Self {
         Self {
             mode: WindowMode::Detailed,
-            text_tone: TextTone::Automatic,
             always_on_top: true,
             locked: false,
             click_through: false,
@@ -129,6 +117,24 @@ pub fn apply_glass(app: &AppHandle, glass_level: f64) -> Result<(), UsageError> 
         22.0
     };
     apply_glass_with_radius(app, glass_level, radius)
+}
+
+pub fn background_is_dark(app: &AppHandle) -> Result<bool, UsageError> {
+    let window = main_window(app)?;
+    #[cfg(target_os = "macos")]
+    {
+        unsafe extern "C" {
+            fn token_usage_background_is_dark(view_pointer: *mut std::ffi::c_void) -> bool;
+        }
+        let ns_view = window
+            .ns_view()
+            .map_err(|_| UsageError::WindowUnavailable)?;
+        Ok(unsafe { token_usage_background_is_dark(ns_view) })
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(false)
+    }
 }
 
 fn apply_glass_with_radius(
@@ -226,6 +232,5 @@ mod tests {
         )
         .expect("deserialize legacy preferences");
         assert_eq!(decoded.glass_level, 0.5);
-        assert_eq!(decoded.text_tone, TextTone::Automatic);
     }
 }

@@ -186,6 +186,11 @@ fn resize_window_for_view(app: tauri::AppHandle, view: String) -> Result<(), Usa
     window::resize_for_view(&app, &view).map_err(UsageErrorPayload::from)
 }
 
+#[tauri::command]
+fn background_is_dark(app: tauri::AppHandle) -> Result<bool, UsageErrorPayload> {
+    window::background_is_dark(&app).map_err(UsageErrorPayload::from)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let window_state = tauri_plugin_window_state::Builder::default()
@@ -239,7 +244,8 @@ pub fn run() {
             get_window_preferences,
             set_window_preferences,
             start_window_drag,
-            resize_window_for_view
+            resize_window_for_view,
+            background_is_dark
         ])
         .run(tauri::generate_context!())
         .expect("error while running Token Usage");
