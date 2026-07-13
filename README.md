@@ -7,7 +7,7 @@
 <p align="center">在 Windows 系统托盘、macOS 状态栏和桌面浮窗中查看 Codex 订阅剩余额度。</p>
 
 <p align="center">
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=最新版&amp;cacheSeconds=300" alt="最新版本"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="最新版本"></a>
   <img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0">
   <img src="https://img.shields.io/badge/macOS-v1.1.3-111111?logo=apple" alt="macOS v1.1.3"><br>
   <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2">
