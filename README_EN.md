@@ -7,7 +7,7 @@
 <p align="center">Check your remaining Codex subscription quota from the macOS menu bar and a small desktop widget.</p>
 
 <p align="center">
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=release&amp;cacheSeconds=300" alt="Latest release"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?logo=apple" alt="macOS 13+"><br>
   <img src="https://img.shields.io/badge/Apple%20Silicon-M1%20or%20newer-555555" alt="Apple Silicon">
 </p>
