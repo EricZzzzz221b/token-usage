@@ -112,7 +112,7 @@ export default function App({
   const [view, setView] = useState<UsageView>({ status: "loading" });
   const [settings, setSettings] = useState<RefreshSettings>(defaultRefreshSettings);
   const [autostart, setAutostartValue] = useState(false);
-  const [appVersion, setAppVersion] = useState("1.1.4");
+  const [appVersion, setAppVersion] = useState("1.1.5");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
