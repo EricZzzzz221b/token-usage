@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, agent/windows-v1.0.0]
+    branches: [main]
 
 permissions:
   contents: read
@@ -60,16 +60,24 @@ jobs:
       - name: Normalize release filenames and checksums
         shell: pwsh
         run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $msi = "outputs/TokenUsage_Windows_${version}_x64.msi"
+          $exe = "outputs/TokenUsage_Windows_${version}_x64-setup.exe"
+          $checksums = "outputs/SHA256SUMS-Windows-${version}.txt"
           New-Item -ItemType Directory -Force outputs | Out-Null
-          Copy-Item (Get-ChildItem src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi | Select-Object -First 1) outputs/TokenUsage_Windows_1.0.0_x64.msi
-          Copy-Item (Get-ChildItem src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe | Select-Object -First 1) outputs/TokenUsage_Windows_1.0.0_x64-setup.exe
-          Get-FileHash outputs/TokenUsage_Windows_1.0.0_x64.msi -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  TokenUsage_Windows_1.0.0_x64.msi" } | Set-Content outputs/SHA256SUMS-Windows-1.0.0.txt
-          Get-FileHash outputs/TokenUsage_Windows_1.0.0_x64-setup.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  TokenUsage_Windows_1.0.0_x64-setup.exe" } | Add-Content outputs/SHA256SUMS-Windows-1.0.0.txt
+          Copy-Item (Get-ChildItem src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi | Select-Object -First 1) $msi
+          Copy-Item (Get-ChildItem src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe | Select-Object -First 1) $exe
+          Get-FileHash $msi -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $msi -Leaf)" } | Set-Content $checksums
+          Get-FileHash $exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $exe -Leaf)" } | Add-Content $checksums
+          "RELEASE_VERSION=$version" | Add-Content $env:GITHUB_ENV
+          "WINDOWS_MSI=$msi" | Add-Content $env:GITHUB_ENV
+          "WINDOWS_EXE=$exe" | Add-Content $env:GITHUB_ENV
+          "WINDOWS_CHECKSUMS=$checksums" | Add-Content $env:GITHUB_ENV
       - uses: actions/upload-artifact@v6
         with:
-          name: TokenUsage-Windows-1.0.0-x64
+          name: TokenUsage-Windows-${{ env.RELEASE_VERSION }}-x64
           path: |
-            outputs/TokenUsage_Windows_1.0.0_x64.msi
-            outputs/TokenUsage_Windows_1.0.0_x64-setup.exe
-            outputs/SHA256SUMS-Windows-1.0.0.txt
+            ${{ env.WINDOWS_MSI }}
+            ${{ env.WINDOWS_EXE }}
+            ${{ env.WINDOWS_CHECKSUMS }}
           if-no-files-found: error

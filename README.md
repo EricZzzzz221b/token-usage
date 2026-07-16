@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="最新版本"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0"><img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.5"><img src="https://img.shields.io/badge/macOS-v1.1.5-111111?logo=apple" alt="macOS v1.1.5"></a>
 </p>
 
@@ -50,19 +50,19 @@ Token用量是一款轻量的跨平台桌面工具。它只读本机 Codex OAuth
 
 | 平台                             | 状态   | 版本与下载                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Windows 11 / Windows 10 22H2 x64 | 可下载 | [v1.0.0](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/TokenUsage_Windows_1.0.0_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/TokenUsage_Windows_1.0.0_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/SHA256SUMS-Windows-1.0.0.txt) |
+| Windows 11 / Windows 10 22H2 x64 | 可下载 | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
 | macOS 13+ Apple Silicon          | 可下载 | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.5) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.5/TokenUsage_1.1.5_arm64.dmg)                                                                                                                                                                                                                                                                             |
 
-### Windows v1.0.0
+### Windows v1.1.5
 
-v1.0.0 首发仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与运行验证。
+Windows 目前仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与运行验证。
 
 1. 优先下载并运行 `.msi`，也可以使用 `-setup.exe`。
-2. 本版本没有商业代码签名证书。若 SmartScreen 显示警告，请先核对 [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/SHA256SUMS-Windows-1.0.0.txt)，再选择“更多信息”→“仍要运行”。哈希不一致时不要继续。
+2. 本版本没有商业代码签名证书。若 SmartScreen 显示警告，请先核对 [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt)，再选择“更多信息”→“仍要运行”。哈希不一致时不要继续。
 3. 安装器内嵌 WebView2 Bootstrapper。系统缺少 Runtime 时会启动 Microsoft 安装流程，因此首次安装可能需要联网；Windows 10 22H2 和 Windows 11 通常已包含 WebView2。
 4. 使用 ChatGPT OAuth 登录 Codex CLI 或客户端。应用支持 `%USERPROFILE%\.codex\auth.json` 与 `CODEX_HOME\auth.json`。
 
-卸载：打开“设置”→“应用”→“已安装的应用”，找到“Token用量”并选择“卸载”。完整说明见 [Windows v1.0.0 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0)。
+卸载：打开“设置”→“应用”→“已安装的应用”，找到“Token用量”并选择“卸载”。完整说明见 [Windows v1.1.5 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5)。
 
 ### macOS v1.1.5
 
@@ -72,7 +72,7 @@ v1.0.0 首发仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与运
 
 - OAuth 凭据只在本机内存中读取，只用于请求 `https://chatgpt.com/backend-api/wham/usage`。
 - 不保存、记录或上传 Access Token、Refresh Token、邮箱、Account ID 或原始认证内容。
-- Windows v1.0.0 不读取 Credential Manager：目前没有经过验证的 Codex 凭据格式，因此不会猜测实现。
+- Windows 不读取 Credential Manager：目前没有经过验证的 Codex 凭据格式，因此不会猜测实现。
 - 本地历史只包含标准化用量，设置和缓存使用 Tauri 系统目录（Windows 为 AppData）。
 - 应用不包含遥测和行为追踪。
 

@@ -27,14 +27,14 @@ npm run tauri -- build --target x86_64-pc-windows-msvc --bundles msi,nsis
 - `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/`
 - `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`
 
-`tauri.windows.conf.json` 会在 Windows 目标上自动与主配置合并，把应用版本覆盖为 1.0.0 并把 bundle 目标改为 MSI 和 NSIS。主配置和 Cargo/package 版本继续保持 macOS v1.1.3。
+`tauri.windows.conf.json` 会在 Windows 目标上自动与主配置合并，并把 bundle 目标改为 MSI 和 NSIS。Windows 与 macOS 从 v1.1.5 起始终使用相同的应用版本号。
 
 Tauri 要求 `macOSPrivateApi` 配置与其 Cargo feature 在主 manifest 中一致；该 feature 自身由 Tauri 在 Windows 上条件编译为空。项目自己的 Objective-C、AppKit、QuartzCore、`ns_view` 和 Liquid Glass 调用仍全部受 `target_os = "macos"` 保护，Windows 构建脚本不会读取或编译 `native/liquid_glass.m`。
 
 ## CI 与发布
 
 - `CI / windows-x64` 在每个 PR 和 main push 上运行完整前端、Rust、Clippy 和安装器构建。
-- 构建产物统一重命名为 `TokenUsage_Windows_1.0.0_x64.msi` 与 `TokenUsage_Windows_1.0.0_x64-setup.exe`，同时生成 SHA-256 artifact。
-- `Release Windows` 是手动工作流，默认创建 `windows-v1.0.0` GitHub Release 并上传两个安装器和校验文件。
+- 构建产物根据 `package.json` 版本自动命名，例如 `TokenUsage_Windows_1.1.5_x64.msi` 与 `TokenUsage_Windows_1.1.5_x64-setup.exe`，同时生成 SHA-256 artifact。
+- `Release Windows` 可由 `windows-v*` 标签或手动触发，版本号必须与同批 macOS 版本一致。
 
 不要在 macOS 上把 `cargo check` 当作 Windows 构建成功；正式结论只以 `windows-latest` Actions 结果为准。
