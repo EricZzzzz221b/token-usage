@@ -73,6 +73,7 @@ struct CoordinatorState {
     last_good: Option<UsageSnapshot>,
     last_error: Option<String>,
     refreshing: bool,
+    transient_failures: u32,
     notified: std::collections::HashSet<String>,
 }
 
@@ -111,17 +112,8 @@ impl RefreshCoordinator {
             }
             loop {
                 let state = coordinator.state.lock().await;
-                let retry_soon = state.last_error.as_deref().is_some_and(|code| {
-                    matches!(
-                        code,
-                        "network_unavailable" | "rate_limited" | "server_unavailable"
-                    )
-                });
-                let seconds = if retry_soon {
-                    30
-                } else {
-                    state.settings.interval_minutes * 60
-                };
+                let seconds =
+                    retry_delay_seconds(&state).unwrap_or(state.settings.interval_minutes * 60);
                 drop(state);
                 tokio::time::sleep(Duration::from_secs(seconds)).await;
                 if coordinator.settings().await.usage_enabled {
@@ -214,10 +206,14 @@ impl RefreshCoordinator {
                     append_snapshot(app, &snapshot);
                     state.last_good = Some(snapshot);
                     state.last_error = None;
+                    state.transient_failures = 0;
                 }
                 Err(error) => {
-                    if !error.is_transient() {
+                    if error.is_transient() {
+                        state.transient_failures = state.transient_failures.saturating_add(1);
+                    } else {
                         state.last_good = None;
+                        state.transient_failures = 0;
                     }
                     state.last_error = Some(error.code().to_owned());
                 }
@@ -227,6 +223,17 @@ impl RefreshCoordinator {
         let _ = app.emit("usage://updated", &view);
         tray::update(app, &view, self.settings().await.tray_window);
         view
+    }
+}
+
+fn retry_delay_seconds(state: &CoordinatorState) -> Option<u64> {
+    let attempt = state.transient_failures.saturating_sub(1).min(5);
+    match state.last_error.as_deref()? {
+        "rate_limited" => Some((60_u64.saturating_mul(1 << attempt)).min(1_800)),
+        "network_unavailable" | "server_unavailable" => {
+            Some((30_u64.saturating_mul(1 << attempt)).min(300))
+        }
+        _ => None,
     }
 }
 
@@ -382,6 +389,7 @@ mod tests {
             }),
             last_error: Some("network_unavailable".into()),
             refreshing: false,
+            transient_failures: 1,
             notified: Default::default(),
         };
         match view_from_state(&state, 2_000) {
@@ -399,11 +407,26 @@ mod tests {
             last_good: None,
             last_error: Some("authentication_expired".into()),
             refreshing: false,
+            transient_failures: 0,
             notified: Default::default(),
         };
         match view_from_state(&state, 2_000) {
             UsageView::Error { code, .. } => assert_eq!(code, "authentication_expired"),
             _ => panic!("authentication errors must be visible immediately"),
         }
+    }
+
+    #[test]
+    fn backs_off_rate_limits_and_caps_the_delay() {
+        let mut state = CoordinatorState {
+            last_error: Some("rate_limited".into()),
+            transient_failures: 1,
+            ..Default::default()
+        };
+        assert_eq!(retry_delay_seconds(&state), Some(60));
+        state.transient_failures = 3;
+        assert_eq!(retry_delay_seconds(&state), Some(240));
+        state.transient_failures = 20;
+        assert_eq!(retry_delay_seconds(&state), Some(1_800));
     }
 }

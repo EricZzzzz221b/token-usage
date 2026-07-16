@@ -33,6 +33,16 @@ const defaultWindowPreferences: WindowPreferences = {
   glassLevel: 0.5,
 };
 
+const defaultRefreshSettings: RefreshSettings = {
+  intervalMinutes: 5,
+  usageEnabled: false,
+  trayWindow: "five_hour",
+  notifySeventy: false,
+  notifyNinety: true,
+  notifyHundred: true,
+  notifyReset: false,
+};
+
 interface AppProps {
   loadUsage?: () => Promise<UsageView>;
   reloadUsage?: () => Promise<UsageView>;
@@ -100,22 +110,19 @@ export default function App({
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
-  const [settings, setSettings] = useState<RefreshSettings>({
-    intervalMinutes: 5,
-    usageEnabled: false,
-    trayWindow: "five_hour",
-    notifySeventy: false,
-    notifyNinety: true,
-    notifyHundred: true,
-    notifyReset: false,
-  });
+  const [settings, setSettings] = useState<RefreshSettings>(defaultRefreshSettings);
   const [autostart, setAutostartValue] = useState(false);
   const [appVersion, setAppVersion] = useState("1.1.4");
   const [refreshing, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
   const preferencesRef = useRef(defaultWindowPreferences);
+  const persistedPreferencesRef = useRef(defaultWindowPreferences);
   const preferenceSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const settingsRef = useRef(defaultRefreshSettings);
+  const persistedSettingsRef = useRef(defaultRefreshSettings);
+  const settingsSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const [saveError, setSaveError] = useState(false);
   const [backdropTone, setBackdropTone] = useState<BackdropTone>("light");
 
   useEffect(() => {
@@ -156,11 +163,16 @@ export default function App({
 
   useEffect(() => {
     void loadUsage().then(setView);
-    void loadSettings().then(setSettings);
+    void loadSettings().then((next) => {
+      settingsRef.current = next;
+      persistedSettingsRef.current = next;
+      setSettings(next);
+    });
     void loadAutostart().then(setAutostartValue);
     void loadAppVersion().then(setAppVersion);
     void loadWindowPreferences().then((next) => {
       preferencesRef.current = next;
+      persistedPreferencesRef.current = next;
       setPreferences(next);
     });
     let active = true;
@@ -169,15 +181,19 @@ export default function App({
     let unlistenWindow: (() => void) | undefined;
     let unlistenMode: (() => void) | undefined;
     void subscribe(setView).then((cleanup) => (active ? (unlisten = cleanup) : cleanup()));
-    void subscribeSettings(setSettings).then((cleanup) =>
-      active ? (unlistenSettings = cleanup) : cleanup(),
-    );
+    void subscribeSettings((next) => {
+      settingsRef.current = next;
+      persistedSettingsRef.current = next;
+      setSettings(next);
+    }).then((cleanup) => (active ? (unlistenSettings = cleanup) : cleanup()));
     void subscribeWindowPreferences((next) => {
       preferencesRef.current = next;
+      persistedPreferencesRef.current = next;
       setPreferences(next);
     }).then((cleanup) => (active ? (unlistenWindow = cleanup) : cleanup()));
     void subscribeWindowModeChanged((next) => {
       preferencesRef.current = next;
+      persistedPreferencesRef.current = next;
       setPreferences(next);
       setScreen("meter");
     }).then((cleanup) => (active ? (unlistenMode = cleanup) : cleanup()));
@@ -216,15 +232,40 @@ export default function App({
   }, [authorizeUsage]);
 
   const updateSettings = useCallback(
-    async (patch: Partial<RefreshSettings>) => {
+    async (
+      patch: Partial<RefreshSettings>,
+      persist: (settings: RefreshSettings) => Promise<RefreshSettings> = saveSettings,
+    ) => {
       const enabling =
         patch.notifySeventy || patch.notifyNinety || patch.notifyHundred || patch.notifyReset;
       if (enabling && !(await ensureNotificationPermission())) return;
-      const next = { ...settings, ...patch };
+      const next = { ...settingsRef.current, ...patch };
+      settingsRef.current = next;
       setSettings(next);
-      await saveSettings(next);
+      setSaveError(false);
+      const save = settingsSaveQueue.current
+        .catch(() => undefined)
+        .then(() => persist(next))
+        .then((saved) => {
+          persistedSettingsRef.current = saved;
+          if (settingsRef.current === next) {
+            settingsRef.current = saved;
+            setSettings(saved);
+          }
+          return saved;
+        })
+        .catch(() => {
+          if (settingsRef.current === next) {
+            settingsRef.current = persistedSettingsRef.current;
+            setSettings(persistedSettingsRef.current);
+            setSaveError(true);
+          }
+          return persistedSettingsRef.current;
+        });
+      settingsSaveQueue.current = save;
+      await save;
     },
-    [saveSettings, settings],
+    [saveSettings],
   );
 
   const updatePreferences = useCallback(
@@ -236,11 +277,20 @@ export default function App({
         .catch(() => undefined)
         .then(() => saveWindowPreferences(next))
         .then((saved) => {
+          persistedPreferencesRef.current = saved;
           if (preferencesRef.current === next) {
             preferencesRef.current = saved;
             setPreferences(saved);
           }
           return saved;
+        })
+        .catch(() => {
+          if (preferencesRef.current === next) {
+            preferencesRef.current = persistedPreferencesRef.current;
+            setPreferences(persistedPreferencesRef.current);
+            setSaveError(true);
+          }
+          return persistedPreferencesRef.current;
         });
       preferenceSaveQueue.current = save;
       return save;
@@ -373,6 +423,11 @@ export default function App({
 
         {screen === "settings" ? (
           <div className="settings-scroll">
+            {saveError && (
+              <p className="stale-notice" role="alert">
+                {t("saveFailed")}
+              </p>
+            )}
             <SettingsGroup title={t("appearanceGroup")}>
               <SelectRow
                 label={t("windowMode")}
@@ -443,8 +498,7 @@ export default function App({
                 value={String(settings.intervalMinutes)}
                 onChange={(value) => {
                   const minutes = Number(value);
-                  setSettings((current) => ({ ...current, intervalMinutes: minutes }));
-                  void saveInterval(minutes);
+                  void updateSettings({ intervalMinutes: minutes }, () => saveInterval(minutes));
                 }}
                 options={[1, 5, 10, 15, 30, 60].map((minutes) => [
                   String(minutes),
@@ -479,8 +533,15 @@ export default function App({
                 label={t("launchAtLogin")}
                 checked={autostart}
                 onChange={(checked) => {
+                  const previous = autostart;
                   setAutostartValue(checked);
-                  void saveAutostart(checked);
+                  setSaveError(false);
+                  void saveAutostart(checked)
+                    .then(setAutostartValue)
+                    .catch(() => {
+                      setAutostartValue(previous);
+                      setSaveError(true);
+                    });
                 }}
               />
               <button

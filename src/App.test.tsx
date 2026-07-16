@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import "./i18n";
+import type { RefreshSettings } from "./usage";
 import type { WindowPreferences } from "./window";
 
 const ready = {
@@ -45,7 +46,7 @@ const defaults = {
     notifyHundred: true,
     notifyReset: false,
   }),
-  saveSettings: vi.fn(),
+  saveSettings: vi.fn(async (settings: RefreshSettings) => settings),
   loadAutostart: vi.fn().mockResolvedValue(false),
   saveAutostart: vi.fn(),
   loadAppVersion: vi.fn().mockResolvedValue("1.1.0"),
@@ -311,5 +312,47 @@ describe("App", () => {
       2,
       expect.objectContaining({ glassLevel: 0.9 }),
     );
+  });
+
+  it("serializes rapid refresh setting updates without losing the newest state", async () => {
+    let resolveFirst: (() => void) | undefined;
+    const saveSettings = vi.fn(
+      (settings: RefreshSettings) =>
+        new Promise<RefreshSettings>((resolve) => {
+          resolveFirst = () => resolve(settings);
+        }),
+    );
+    const saveInterval = vi.fn(async () => ({
+      ...(await defaults.loadSettings()),
+      intervalMinutes: 10,
+      trayWindow: "seven_day" as const,
+    }));
+    render(<App {...defaults} saveSettings={saveSettings} saveInterval={saveInterval} />);
+    await screen.findAllByRole("progressbar");
+    fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
+    fireEvent.change(screen.getByLabelText(/托盘显示周期|System tray window/), {
+      target: { value: "seven_day" },
+    });
+    fireEvent.change(screen.getByLabelText(/自动刷新|Auto refresh/), {
+      target: { value: "10" },
+    });
+
+    await waitFor(() => expect(saveSettings).toHaveBeenCalledOnce());
+    expect(saveInterval).not.toHaveBeenCalled();
+    await act(async () => resolveFirst?.());
+    await waitFor(() => expect(saveInterval).toHaveBeenCalledOnce());
+    expect(screen.getByLabelText(/托盘显示周期|System tray window/)).toHaveValue("seven_day");
+    expect(screen.getByLabelText(/自动刷新|Auto refresh/)).toHaveValue("10");
+  });
+
+  it("restores a setting and shows an error when saving fails", async () => {
+    render(<App {...defaults} saveSettings={vi.fn().mockRejectedValue(new Error("disk full"))} />);
+    await screen.findAllByRole("progressbar");
+    fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
+    const trayWindow = screen.getByLabelText(/托盘显示周期|System tray window/);
+    fireEvent.change(trayWindow, { target: { value: "seven_day" } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/保存失败|could not be saved/);
+    expect(trayWindow).toHaveValue("five_hour");
   });
 });
