@@ -12,11 +12,15 @@
 
 ## 安装
 
+macOS：
+
 1. 下载并打开 `TokenUsage_1.1.5_arm64.dmg`。
 2. 将 `Token用量.app` 拖入 `Applications`。
 3. 首次打开时，在 Finder 中右键应用并选择“打开”，然后再次确认。
 
 系统要求：Apple Silicon Mac，macOS 13 或更高版本。
+
+Windows：下载 `TokenUsage_Windows_1.1.5_x64.msi` 或 `TokenUsage_Windows_1.1.5_x64-setup.exe`，安装前可使用 `SHA256SUMS-Windows-1.1.5.txt` 核对文件完整性。支持 Windows 11 x64 和 Windows 10 22H2 x64。
 
 ## 隐私
 
