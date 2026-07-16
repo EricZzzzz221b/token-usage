@@ -9,7 +9,7 @@
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="最新版本"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0"><img src="https://img.shields.io/badge/Windows-v1.0.0-0078D4?logo=windows11" alt="Windows v1.0.0"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.4"><img src="https://img.shields.io/badge/macOS-v1.1.4-111111?logo=apple" alt="macOS v1.1.4"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.5"><img src="https://img.shields.io/badge/macOS-v1.1.5-111111?logo=apple" alt="macOS v1.1.5"></a>
 </p>
 
 <p align="center">
@@ -51,7 +51,7 @@ Token用量是一款轻量的跨平台桌面工具。它只读本机 Codex OAuth
 | 平台                             | 状态   | 版本与下载                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Windows 11 / Windows 10 22H2 x64 | 可下载 | [v1.0.0](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/TokenUsage_Windows_1.0.0_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/TokenUsage_Windows_1.0.0_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.0.0/SHA256SUMS-Windows-1.0.0.txt) |
-| macOS 13+ Apple Silicon          | 可下载 | [v1.1.4](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.4) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.4/TokenUsage_1.1.4_arm64.dmg)                                                                                                                                                                                                                                                                             |
+| macOS 13+ Apple Silicon          | 可下载 | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.5) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.5/TokenUsage_1.1.5_arm64.dmg)                                                                                                                                                                                                                                                                             |
 
 ### Windows v1.0.0
 
@@ -64,9 +64,9 @@ v1.0.0 首发仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与运
 
 卸载：打开“设置”→“应用”→“已安装的应用”，找到“Token用量”并选择“卸载”。完整说明见 [Windows v1.0.0 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.0.0)。
 
-### macOS v1.1.4
+### macOS v1.1.5
 
-下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.4/TokenUsage_1.1.4_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。macOS v1.1.4 按照 Apple 官方 `NSGlassEffectView.contentView` 结构修复局部配色适配，不读取桌面壁纸、不截取屏幕，也不需要屏幕录制权限。
+下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.5/TokenUsage_1.1.5_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。v1.1.5 加固了接口重试和设置保存，并保留不读取桌面壁纸、不截取屏幕、不需要屏幕录制权限的隐私边界。
 
 ## 隐私
 
