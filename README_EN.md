@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.0-beta.14"><img src="https://img.shields.io/badge/macOS-v1.2.0--beta.14-111111?logo=apple" alt="macOS v1.2.0-beta.14"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.0"><img src="https://img.shields.io/badge/macOS-v1.2.0-111111?logo=apple" alt="macOS v1.2.0"></a>
 </p>
 
 <p align="center">
@@ -89,15 +89,15 @@ The app detects whether the official account is using a subscription or API mode
 | Platform                         | Status    | Version and download                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Windows 11 / Windows 10 22H2 x64 | Available | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
-| macOS 13+ Apple Silicon          | Preview   | [v1.2.0-beta.14](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.0-beta.14) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0-beta.14/TokenUsage_1.2.0-beta.14_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0-beta.14/SHA256SUMS-1.2.0-beta.14.txt)                                                                                                                     |
+| macOS 13+ Apple Silicon          | Available | [v1.2.0](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.0) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0/TokenUsage_1.2.0_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0/SHA256SUMS-1.2.0.txt)                                                                                                                                                                     |
 
 ### Windows v1.1.5
 
 The Windows release supports x64 only. Prefer the MSI, or use the NSIS setup EXE. The installers are unsigned, so verify the published SHA-256 before using **More info → Run anyway** in SmartScreen. The embedded WebView2 bootstrapper starts Microsoft's installation flow if the runtime is missing. Uninstall from **Settings → Apps → Installed apps**. See the [Windows v1.1.5 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) for details.
 
-### macOS v1.2.0-beta.14
+### macOS v1.2.0
 
-Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0-beta.14/TokenUsage_1.2.0-beta.14_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. beta.14 adds account-mode detection, Credits and reset opportunities, live Codex task status, completion notifications, and conversation shortcuts. Incremental session-event reading reduces repeated background work. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
+Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0/TokenUsage_1.2.0_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. v1.2.0 adds account-mode detection, Credits and reset opportunities, live Codex task status, completion notifications, and conversation shortcuts. Incremental session-event reading reduces repeated background work. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
 ## Privacy
 
