@@ -239,7 +239,6 @@ export default function App({
     });
     void loadAutostart().then(setAutostartValue);
     void loadAppVersion().then(setAppVersion);
-    void loadTasks().then(setTasks);
     void loadAccountMode().then((report) => setAccountMode(report.mode));
     void loadWindowPreferences().then((next) => {
       preferencesRef.current = next;
@@ -269,9 +268,18 @@ export default function App({
       setPreferences(next);
       setScreen("meter");
     }).then((cleanup) => (active ? (unlistenMode = cleanup) : cleanup()));
-    void subscribeTasks(setTasks).then((cleanup) =>
-      active ? (unlistenTasks = cleanup) : cleanup(),
-    );
+    void subscribeTasks(setTasks).then((cleanup) => {
+      if (!active) {
+        cleanup();
+        return;
+      }
+      unlistenTasks = cleanup;
+      // Read only after the listener is live so the monitor's initial snapshot
+      // cannot land in the gap between the first read and subscription setup.
+      void loadTasks().then((snapshot) => {
+        if (active) setTasks(snapshot);
+      });
+    });
     return () => {
       active = false;
       unlisten?.();
@@ -774,7 +782,9 @@ function TaskTabContent({
     <div className="task-tab-content">
       <div className="active-task-list" aria-label={t("activeTasks")}>
         {activeTasks.length > 0 ? (
-          activeTasks.map((task) => <StatusHero key={task.id} task={task} now={now} t={t} />)
+          activeTasks.map((task) => (
+            <StatusHero key={task.id} task={task} now={now} t={t} onOpenTask={onOpenTask} />
+          ))
         ) : (
           <StatusHero task={fallbackTask} now={now} t={t} />
         )}
@@ -811,14 +821,16 @@ function StatusHero({
   task,
   now,
   t,
+  onOpenTask,
 }: {
   task?: CodexTask;
   now: number;
   t: ReturnType<typeof useTranslation>["t"];
+  onOpenTask?: (sessionId: string) => Promise<void>;
 }) {
   const status = task?.status ?? "unknown";
-  return (
-    <section className={`status-hero status-${status}`} aria-live="polite">
+  const content = (
+    <>
       <span className="status-signal" aria-hidden="true" />
       <div className="status-hero-copy">
         <div className="status-line">
@@ -828,6 +840,24 @@ function StatusHero({
         <p>{task?.title ?? t("tasksIdleHint")}</p>
         {task && <small>{task.project}</small>}
       </div>
+    </>
+  );
+  if (task?.sessionId && onOpenTask) {
+    return (
+      <button
+        className={`status-hero status-hero-button status-${status}`}
+        type="button"
+        aria-label={`${task.title} · ${t("openTask")}`}
+        title={t("openTask")}
+        onClick={() => void onOpenTask(task.sessionId!)}
+      >
+        {content}
+      </button>
+    );
+  }
+  return (
+    <section className={`status-hero status-${status}`} aria-live="polite">
+      {content}
     </section>
   );
 }
@@ -931,24 +961,38 @@ function MeterContent({
       </div>
       {view.snapshot.resetCredits && view.snapshot.resetCredits.availableCount > 0 && (
         <section className="reset-credits" aria-label={t("resetCreditsTitle")}>
-          <button
-            className="reset-credits-heading"
-            type="button"
-            aria-expanded={resetsExpanded}
-            onClick={() => onResetsExpandedChange(!resetsExpanded)}
-          >
-            <strong>{t("resetCreditsTitle")}</strong>
-            <span className="reset-heading-actions">
-              <span>
-                {t("resetCreditsAvailable", {
-                  count: view.snapshot.resetCredits.availableCount,
-                })}
+          {view.snapshot.resetCredits.credits.length > 0 ? (
+            <button
+              className="reset-credits-heading"
+              type="button"
+              aria-expanded={resetsExpanded}
+              onClick={() => onResetsExpandedChange(!resetsExpanded)}
+            >
+              <strong>{t("resetCreditsTitle")}</strong>
+              <span className="reset-heading-actions">
+                <span>
+                  {t("resetCreditsAvailable", {
+                    count: view.snapshot.resetCredits.availableCount,
+                  })}
+                </span>
+                <span
+                  className={`reset-chevron${resetsExpanded ? " is-expanded" : ""}`}
+                  aria-hidden="true"
+                />
               </span>
-              <span className="reset-chevron" aria-hidden="true">
-                {resetsExpanded ? "⌃" : "⌄"}
+            </button>
+          ) : (
+            <div className="reset-credits-heading reset-credits-summary">
+              <strong>{t("resetCreditsTitle")}</strong>
+              <span className="reset-heading-actions">
+                <span>
+                  {t("resetCreditsAvailable", {
+                    count: view.snapshot.resetCredits.availableCount,
+                  })}
+                </span>
               </span>
-            </span>
-          </button>
+            </div>
+          )}
           {resetsExpanded && view.snapshot.resetCredits.credits.length > 0 && (
             <div className="reset-credit-list">
               {view.snapshot.resetCredits.credits.map((credit, index) => (

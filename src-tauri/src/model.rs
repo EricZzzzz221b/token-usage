@@ -58,8 +58,9 @@ pub(crate) struct CodexUsageResponse {
 
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct CodexResetCredits {
+    #[serde(alias = "availableCount", alias = "count")]
     pub available_count: Option<serde_json::Value>,
-    #[serde(default)]
+    #[serde(default, alias = "reset_credits", alias = "resetCredits")]
     pub credits: Vec<CodexResetCredit>,
 }
 

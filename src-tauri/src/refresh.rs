@@ -5,12 +5,19 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 use tokio::sync::Mutex;
 
-use crate::{credentials, error::UsageError, model::UsageSnapshot, tray, usage::UsageClient};
+use crate::{
+    credentials,
+    error::UsageError,
+    model::{RateLimitResetCredits, UsageSnapshot},
+    tray,
+    usage::UsageClient,
+};
 
 const DEFAULT_INTERVAL_MINUTES: u64 = 5;
 const MIN_INTERVAL_MINUTES: u64 = 1;
 const MAX_INTERVAL_MINUTES: u64 = 1_440;
 const LAST_GOOD_GRACE_MILLIS: i64 = 30 * 60 * 1_000;
+const RESET_CREDITS_GRACE_MILLIS: i64 = 30 * 60 * 1_000;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -75,6 +82,8 @@ struct CoordinatorState {
     refreshing: bool,
     transient_failures: u32,
     notified: std::collections::HashSet<String>,
+    last_reset_credits: Option<RateLimitResetCredits>,
+    last_reset_credits_at: Option<i64>,
 }
 
 #[derive(Clone)]
@@ -179,7 +188,8 @@ impl RefreshCoordinator {
             let mut state = self.state.lock().await;
             state.refreshing = false;
             match result {
-                Ok(snapshot) => {
+                Ok(mut snapshot) => {
+                    preserve_reset_credits(&mut state, &mut snapshot, now_millis());
                     if state.settings.notify_reset {
                         if let Some(previous) = &state.last_good {
                             for current in &snapshot.windows {
@@ -223,6 +233,24 @@ impl RefreshCoordinator {
         let _ = app.emit("usage://updated", &view);
         tray::update(app, &view, self.settings().await.tray_window);
         view
+    }
+}
+
+fn preserve_reset_credits(state: &mut CoordinatorState, snapshot: &mut UsageSnapshot, now: i64) {
+    if let Some(current) = snapshot.reset_credits.clone() {
+        state.last_reset_credits = Some(current);
+        state.last_reset_credits_at = Some(now);
+        return;
+    }
+
+    let cache_is_fresh = state
+        .last_reset_credits_at
+        .is_some_and(|cached_at| now.saturating_sub(cached_at) <= RESET_CREDITS_GRACE_MILLIS);
+    if cache_is_fresh {
+        snapshot.reset_credits = state.last_reset_credits.clone();
+    } else {
+        state.last_reset_credits = None;
+        state.last_reset_credits_at = None;
     }
 }
 
@@ -337,7 +365,24 @@ fn now_millis() -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::UsageWindow;
+    use crate::model::{RateLimitResetCredit, UsageWindow};
+
+    fn snapshot(reset_credits: Option<RateLimitResetCredits>) -> UsageSnapshot {
+        UsageSnapshot {
+            source: "codex_oauth".into(),
+            plan_type: Some("plus".into()),
+            credits: None,
+            reset_credits,
+            windows: vec![UsageWindow {
+                id: "seven_day".into(),
+                label: "7 days".into(),
+                duration_seconds: Some(604_800),
+                used_percent: 42.0,
+                reset_at: None,
+            }],
+            queried_at: 1_000,
+        }
+    }
 
     #[test]
     fn validates_refresh_interval_bounds() {
@@ -394,6 +439,8 @@ mod tests {
             refreshing: false,
             transient_failures: 1,
             notified: Default::default(),
+            last_reset_credits: None,
+            last_reset_credits_at: None,
         };
         match view_from_state(&state, 2_000) {
             UsageView::Ready { last_error, .. } => {
@@ -412,6 +459,8 @@ mod tests {
             refreshing: false,
             transient_failures: 0,
             notified: Default::default(),
+            last_reset_credits: None,
+            last_reset_credits_at: None,
         };
         match view_from_state(&state, 2_000) {
             UsageView::Error { code, .. } => assert_eq!(code, "authentication_expired"),
@@ -431,5 +480,47 @@ mod tests {
         assert_eq!(retry_delay_seconds(&state), Some(240));
         state.transient_failures = 20;
         assert_eq!(retry_delay_seconds(&state), Some(1_800));
+    }
+
+    #[test]
+    fn preserves_recent_reset_credits_when_one_response_omits_them() {
+        let resets = RateLimitResetCredits {
+            available_count: 3,
+            credits: vec![RateLimitResetCredit {
+                id: Some("reset-1".into()),
+                reset_type: Some("codex_rate_limits".into()),
+                status: Some("available".into()),
+                title: Some("Full reset".into()),
+                description: None,
+                expires_at: Some(2_000_000_000),
+            }],
+        };
+        let mut state = CoordinatorState::default();
+        let mut initial = snapshot(Some(resets.clone()));
+        preserve_reset_credits(&mut state, &mut initial, 10_000);
+
+        let mut incomplete = snapshot(None);
+        preserve_reset_credits(&mut state, &mut incomplete, 20_000);
+        assert_eq!(incomplete.reset_credits, Some(resets));
+    }
+
+    #[test]
+    fn expires_cached_reset_credits_after_grace_period() {
+        let mut state = CoordinatorState {
+            last_reset_credits: Some(RateLimitResetCredits {
+                available_count: 3,
+                credits: Vec::new(),
+            }),
+            last_reset_credits_at: Some(10_000),
+            ..Default::default()
+        };
+        let mut incomplete = snapshot(None);
+        preserve_reset_credits(
+            &mut state,
+            &mut incomplete,
+            10_000 + RESET_CREDITS_GRACE_MILLIS + 1,
+        );
+        assert_eq!(incomplete.reset_credits, None);
+        assert_eq!(state.last_reset_credits, None);
     }
 }

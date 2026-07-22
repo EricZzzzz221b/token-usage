@@ -173,6 +173,27 @@ describe("App", () => {
     expect(screen.getByText("Full reset")).toBeInTheDocument();
   });
 
+  it("does not offer an empty reset-credit disclosure", async () => {
+    render(
+      <App
+        {...defaults}
+        loadUsage={vi.fn().mockResolvedValue({
+          ...ready,
+          snapshot: {
+            ...ready.snapshot,
+            resetCredits: { availableCount: 3, credits: [] },
+          },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText(/使用限额重置|Usage limit resets/)).toBeInTheDocument();
+    expect(screen.getByText(/可用 3 次|3 available/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /使用限额重置|Usage limit resets/ }),
+    ).not.toBeInTheDocument();
+  });
+
   it("separates usage and tasks into tabs", async () => {
     render(
       <App
@@ -238,6 +259,54 @@ describe("App", () => {
     expect(screen.queryByText("完成任务 6")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /完成任务 3.*Codex/ }));
     expect(openTask).toHaveBeenCalledWith("019f0000-0000-7000-8000-000000000002");
+  });
+
+  it("opens an active task in its Codex thread", async () => {
+    const openTask = vi.fn().mockResolvedValue(undefined);
+    render(
+      <App
+        {...defaults}
+        openTask={openTask}
+        loadTasks={vi.fn().mockResolvedValue({
+          queriedAt: Date.now(),
+          tasks: [
+            {
+              id: "active-task",
+              sessionId: "019f0000-0000-7000-8000-000000000099",
+              title: "修复重置机会",
+              project: "Token用量",
+              status: "thinking" as const,
+              startedAt: Date.now() - 10_000,
+              updatedAt: Date.now(),
+            },
+          ],
+        })}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /任务|Tasks/ }));
+    fireEvent.click(screen.getByRole("button", { name: /修复重置机会.*Codex/ }));
+    expect(openTask).toHaveBeenCalledWith("019f0000-0000-7000-8000-000000000099");
+  });
+
+  it("subscribes before loading the initial task snapshot", async () => {
+    const order: string[] = [];
+    render(
+      <App
+        {...defaults}
+        loadTasks={vi.fn().mockImplementation(async () => {
+          order.push("load");
+          return { queriedAt: Date.now(), tasks: [] };
+        })}
+        subscribeTasks={vi.fn().mockImplementation(async () => {
+          order.push("subscribe");
+          return vi.fn();
+        })}
+      />,
+    );
+
+    await waitFor(() => expect(order).toContain("load"));
+    expect(order.slice(0, 2)).toEqual(["subscribe", "load"]);
   });
 
   it("shows the detected subscription at the top and hides monetary credits", async () => {

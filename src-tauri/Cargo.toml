@@ -1,6 +1,6 @@
 [package]
 name = "token-usage"
-version = "1.2.0"
+version = "1.2.1"
 authors = ["Eric Zhang"]
 description = "A cross-platform monitor for Codex subscription token usage"
 edition = "2021"
