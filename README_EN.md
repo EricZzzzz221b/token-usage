@@ -4,12 +4,14 @@
 
 <h1 align="center">Token Usage</h1>
 
-<p align="center">Check your remaining Codex subscription quota from the Windows system tray, macOS menu bar, and a small desktop widget.</p>
+<p align="center"><strong>Know how much quota is left and whether Codex is done—without switching back.</strong></p>
+
+<p align="center">A Codex usage and task monitor for the Windows system tray and macOS menu bar.</p>
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.5"><img src="https://img.shields.io/badge/macOS-v1.1.5-111111?logo=apple" alt="macOS v1.1.5"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.0-beta.14"><img src="https://img.shields.io/badge/macOS-v1.2.0--beta.14-111111?logo=apple" alt="macOS v1.2.0-beta.14"></a>
 </p>
 
 <p align="center">
@@ -18,14 +20,47 @@
   · <a href="README.md">中文</a>
 </p>
 
-Token Usage is a lightweight cross-platform utility that reads your local Codex sign-in, shows the remaining quota and reset time for the 5-hour and 7-day windows, and can notify you when quota is running low. Windows and macOS installers are published together on the [Releases](https://github.com/EricZzzzz221b/token-usage/releases) page.
+Token Usage puts the two Codex details you check most often into one small widget: **how much quota remains, and whether your current tasks are still running**. Keep working in your browser, editor, or design tool while the menu bar shows whether Codex is thinking, executing a tool, or waiting for input. When a task finishes, the app can notify you and open the matching Codex conversation from the recent list.
+
+The app detects whether the official account is using a subscription or API mode. Subscription accounts show plan information and usage windows; API mode shows Credits when the official response provides them. Credentials, usage data, and task detection stay on your Mac or PC.
+
+## What it helps you do
+
+### Leave Codex without losing track of work
+
+- See every active task separately instead of one merged status
+- Distinguish thinking, executing, waiting, completed, failed, and interrupted states
+- See task status, elapsed time, active task count, and remaining quota in the menu bar
+- Keep the five most recent completed tasks and reopen the matching Codex conversation
+- Receive a local notification when a task finishes
+
+### Plan around quota with less guesswork
+
+- Read quota as 100% when full and 0% when exhausted
+- Track the 5-hour, 7-day, and other windows returned by the official service
+- See the 7-day reset as a calendar date
+- See available usage-limit reset opportunities and their expiry information
+- Configure low-quota, exhausted-quota, and quota-restored notifications
+
+### Stay available without taking over the desktop
+
+- Use detailed mode for quota, tasks, and recent completions
+- Use compact mode for only the current task, elapsed time, and quota
+- Keep the widget on top, lock its position, enable click-through, or launch it at login
+- Choose whether the macOS app appears in the Dock
+- Choose the 5-hour or 7-day value shown in the tray or menu bar
 
 ## Features
 
 - Remaining quota shown as 100% when full and 0% when exhausted
+- Automatic subscription/API mode detection; Credits are shown only in API mode when available
+- Usage-limit reset opportunities with a collapsed-by-default details section
 - Choose the 5-hour or 7-day window in the system tray or menu bar
 - Detailed and compact widgets with quick switching from the widget or tray
 - Manual refresh, configurable refresh interval, and quota alerts
+- Live local Codex task detection, elapsed time, five recent completions, and completion notifications
+- One-click navigation from a completed task to its Codex conversation
+- Multiple active tasks displayed separately
 - Always on top, position lock, click-through, and launch at login
 - Windows 11 Mica, Windows 10 Acrylic, and a readable solid-color fallback
 - Automatic light/dark contrast and basic Windows high-contrast support
@@ -33,9 +68,12 @@ Token Usage is a lightweight cross-platform utility that reads your local Codex 
 
 ## Preview
 
-<p align="center">
-  <img src="assets/screenshot-detailed.png" width="360" alt="Detailed mode">
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="assets/screenshot-detailed.png" width="360" alt="Usage view"><br><sub>Quota, reset date, and reset opportunities</sub></td>
+    <td align="center"><img src="assets/screenshot-tasks.png" width="360" alt="Task view"><br><sub>Active tasks and recent completions</sub></td>
+  </tr>
+</table>
 
 <p align="center">
   <img src="assets/screenshot-compact.png" width="320" alt="Compact mode">
@@ -51,19 +89,20 @@ Token Usage is a lightweight cross-platform utility that reads your local Codex 
 | Platform                         | Status    | Version and download                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Windows 11 / Windows 10 22H2 x64 | Available | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
-| macOS 13+ Apple Silicon          | Available | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.1.5) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.5/TokenUsage_1.1.5_arm64.dmg)                                                                                                                                                                                                                                                                             |
+| macOS 13+ Apple Silicon          | Preview   | [v1.2.0-beta.14](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.0-beta.14) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0-beta.14/TokenUsage_1.2.0-beta.14_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0-beta.14/SHA256SUMS-1.2.0-beta.14.txt)                                                                                                                     |
 
 ### Windows v1.1.5
 
 The Windows release supports x64 only. Prefer the MSI, or use the NSIS setup EXE. The installers are unsigned, so verify the published SHA-256 before using **More info → Run anyway** in SmartScreen. The embedded WebView2 bootstrapper starts Microsoft's installation flow if the runtime is missing. Uninstall from **Settings → Apps → Installed apps**. See the [Windows v1.1.5 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) for details.
 
-### macOS v1.1.5
+### macOS v1.2.0-beta.14
 
-Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.1.5/TokenUsage_1.1.5_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. v1.1.5 hardens API retries and settings persistence while preserving the privacy boundary: it does not read the wallpaper, capture the screen, or request Screen Recording permission. The current build is not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
+Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0-beta.14/TokenUsage_1.2.0-beta.14_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. beta.14 adds account-mode detection, Credits and reset opportunities, live Codex task status, completion notifications, and conversation shortcuts. Incremental session-event reading reduces repeated background work. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
 ## Privacy
 
 - OAuth credentials are read into local memory only and used solely for the official Codex usage endpoint.
+- Task status incrementally reads local Codex lifecycle events; full prompts, responses, command output, and file contents are not uploaded or copied into app storage.
 - The app does not store, log, or upload access tokens, refresh tokens, email addresses, account IDs, or raw authentication data.
 - Windows reads `%USERPROFILE%\.codex\auth.json` or `CODEX_HOME\auth.json`; it does not guess or read unverified Credential Manager formats.
 - Settings and cache use Tauri system directories, including AppData on Windows.

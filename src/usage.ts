@@ -13,6 +13,24 @@ export interface UsageSnapshot {
   source: "codex_oauth";
   windows: UsageWindow[];
   queriedAt: number;
+  planType?: string;
+  credits?: {
+    hasCredits: boolean;
+    unlimited: boolean;
+    balance?: string;
+    expiresAt?: number;
+  };
+  resetCredits?: {
+    availableCount: number;
+    credits: Array<{
+      id?: string;
+      resetType?: string;
+      status?: string;
+      title?: string;
+      description?: string;
+      expiresAt?: number;
+    }>;
+  };
 }
 
 export type UsageView =

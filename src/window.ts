@@ -8,6 +8,7 @@ export interface WindowPreferences {
   alwaysOnTop: boolean;
   locked: boolean;
   clickThrough: boolean;
+  showDockIcon: boolean;
   glassLevel: number;
 }
 

@@ -23,7 +23,8 @@ const windowPreferences = {
   alwaysOnTop: true,
   locked: false,
   clickThrough: false,
-  glassLevel: 0.5,
+  showDockIcon: false,
+  glassLevel: 1,
 };
 const defaults = {
   loadUsage: vi.fn().mockResolvedValue(ready),
@@ -61,6 +62,7 @@ const defaults = {
   resizeView: vi.fn().mockResolvedValue(undefined),
   detectBackdrop: vi.fn().mockResolvedValue("light" as const),
   backdropPollIntervalMs: 10,
+  loadAccountMode: vi.fn().mockResolvedValue({ mode: "subscription" as const }),
 };
 
 afterEach(() => {
@@ -97,6 +99,184 @@ describe("App", () => {
     expect(progressbar).toHaveClass("risk-track-limit");
     expect(screen.getByText("0%")).toHaveClass("risk-text-limit");
   });
+  it("adapts when the API omits the five-hour quota", async () => {
+    render(
+      <App
+        {...defaults}
+        loadUsage={vi.fn().mockResolvedValue({
+          ...ready,
+          snapshot: {
+            ...ready.snapshot,
+            windows: [{ id: "seven_day", label: "7 days", usedPercent: 68 }],
+          },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText(/7 天窗口|7-day window/)).toBeInTheDocument();
+    expect(screen.queryByText(/5 小时窗口|5-hour window/)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("progressbar")).toHaveLength(1);
+  });
+
+  it("shows usage-limit reset opportunities separately from credits", async () => {
+    render(
+      <App
+        {...defaults}
+        loadUsage={vi.fn().mockResolvedValue({
+          ...ready,
+          snapshot: {
+            ...ready.snapshot,
+            resetCredits: {
+              availableCount: 3,
+              credits: [{ id: "reset-1", title: "Full reset", expiresAt: 2_000_000_000 }],
+            },
+          },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText(/使用限额重置|Usage limit resets/)).toBeInTheDocument();
+    expect(screen.getByText(/可用 3 次|3 available/)).toBeInTheDocument();
+    expect(screen.queryByText("Full reset")).not.toBeInTheDocument();
+  });
+
+  it("collapses and expands usage-limit reset details", async () => {
+    render(
+      <App
+        {...defaults}
+        loadUsage={vi.fn().mockResolvedValue({
+          ...ready,
+          snapshot: {
+            ...ready.snapshot,
+            resetCredits: {
+              availableCount: 1,
+              credits: [{ id: "reset-1", title: "Full reset", expiresAt: 2_000_000_000 }],
+            },
+          },
+        })}
+      />,
+    );
+
+    const toggle = await screen.findByRole("button", { name: /使用限额重置|Usage limit resets/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Full reset")).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Full reset")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /任务|Tasks/ }));
+    fireEvent.click(screen.getByRole("button", { name: /用量|Usage/ }));
+    const restoredToggle = screen.getByRole("button", {
+      name: /使用限额重置|Usage limit resets/,
+    });
+    expect(restoredToggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Full reset")).toBeInTheDocument();
+  });
+
+  it("separates usage and tasks into tabs", async () => {
+    render(
+      <App
+        {...defaults}
+        loadTasks={vi.fn().mockResolvedValue({
+          queriedAt: Date.now(),
+          tasks: [
+            {
+              id: "task-1",
+              title: "重新设计额度窗口",
+              project: "Token用量",
+              status: "thinking" as const,
+              startedAt: Date.now() - 10_000,
+              updatedAt: Date.now(),
+            },
+            {
+              id: "task-2",
+              title: "修复幽灵任务",
+              project: "Token用量",
+              status: "executing" as const,
+              startedAt: Date.now() - 20_000,
+              updatedAt: Date.now(),
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(await screen.findByRole("button", { name: /任务|Tasks/ })).toBeInTheDocument();
+    expect(screen.queryByText("重新设计额度窗口")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /任务|Tasks/ }));
+    expect(await screen.findByText("重新设计额度窗口")).toBeInTheDocument();
+    expect(screen.getByText("修复幽灵任务")).toBeInTheDocument();
+    expect(screen.queryByText(/另有 1 个任务|1 more active/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("shows five recent completions and opens the selected Codex thread", async () => {
+    const openTask = vi.fn().mockResolvedValue(undefined);
+    const now = Date.now();
+    render(
+      <App
+        {...defaults}
+        openTask={openTask}
+        loadTasks={vi.fn().mockResolvedValue({
+          queriedAt: now,
+          tasks: Array.from({ length: 6 }, (_, index) => ({
+            id: `task-${index}`,
+            sessionId: `019f0000-0000-7000-8000-00000000000${index}`,
+            title: `完成任务 ${index + 1}`,
+            project: "Token用量",
+            status: "completed" as const,
+            startedAt: now - 60_000,
+            updatedAt: now - index * 1_000,
+            completedAt: now - index * 1_000,
+          })),
+        })}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /任务|Tasks/ }));
+    expect(screen.getByText("完成任务 5")).toBeInTheDocument();
+    expect(screen.queryByText("完成任务 6")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /完成任务 3.*Codex/ }));
+    expect(openTask).toHaveBeenCalledWith("019f0000-0000-7000-8000-000000000002");
+  });
+
+  it("shows the detected subscription at the top and hides monetary credits", async () => {
+    render(
+      <App
+        {...defaults}
+        loadUsage={vi.fn().mockResolvedValue({
+          ...ready,
+          snapshot: {
+            ...ready.snapshot,
+            planType: "plus",
+            credits: { hasCredits: true, unlimited: false, balance: "120" },
+          },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText(/PLUS 订阅|PLUS subscription/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Credits")).not.toBeInTheDocument();
+  });
+
+  it("shows monetary credits only in API mode when balance data is available", async () => {
+    render(
+      <App
+        {...defaults}
+        loadAccountMode={vi.fn().mockResolvedValue({ mode: "api" as const })}
+        loadUsage={vi.fn().mockResolvedValue({
+          ...ready,
+          snapshot: {
+            ...ready.snapshot,
+            credits: { hasCredits: true, unlimited: false, balance: "120" },
+          },
+        })}
+      />,
+    );
+
+    expect(await screen.findByText(/API 模式|API mode/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Credits")).toBeInTheDocument();
+  });
   it("starts dragging from the header", async () => {
     const dragWindow = vi.fn().mockResolvedValue(undefined);
     render(<App {...defaults} dragWindow={dragWindow} />);
@@ -117,6 +297,19 @@ describe("App", () => {
     await waitFor(() =>
       expect(saveWindowPreferences).toHaveBeenCalledWith(
         expect.objectContaining({ mode: "compact" }),
+      ),
+    );
+  });
+
+  it("saves whether the app icon appears in the Dock", async () => {
+    const saveWindowPreferences = vi.fn(async (preferences: WindowPreferences) => preferences);
+    render(<App {...defaults} saveWindowPreferences={saveWindowPreferences} />);
+    await screen.findAllByRole("progressbar");
+    fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
+    fireEvent.click(screen.getByLabelText(/在 Dock 中显示图标|Show icon in Dock/));
+    await waitFor(() =>
+      expect(saveWindowPreferences).toHaveBeenCalledWith(
+        expect.objectContaining({ showDockIcon: true }),
       ),
     );
   });
@@ -157,8 +350,8 @@ describe("App", () => {
       />,
     );
 
-    expect(await screen.findByText("58%")).toBeInTheDocument();
-    expect(screen.getByText("32%")).toBeInTheDocument();
+    expect(await screen.findByText("5h 58%")).toBeInTheDocument();
+    expect(screen.queryByText("32%")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /切换到标准模式|Switch to standard mode/ }));
 
     await waitFor(() =>
@@ -199,7 +392,7 @@ describe("App", () => {
         })}
       />,
     );
-    expect(await screen.findByRole("status")).toHaveTextContent(/正在读取|Loading/);
+    expect(await screen.findByText(/正在读取|Loading/)).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
@@ -222,7 +415,7 @@ describe("App", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
-  it("shows the configured refresh interval and one continuous glass control", async () => {
+  it("shows the configured refresh interval without a glass control", async () => {
     render(
       <App
         {...defaults}
@@ -239,9 +432,7 @@ describe("App", () => {
     );
     expect(await screen.findByText(/自动刷新 10 分钟|Refreshes every 10 min/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
-    const glassEffect = screen.getByLabelText(/玻璃效果|Glass effect/) as HTMLInputElement;
-    expect(glassEffect.type).toBe("range");
-    expect(glassEffect.value).toBe("0.5");
+    expect(screen.queryByLabelText(/玻璃效果|Glass effect/)).not.toBeInTheDocument();
     const trayWindow = screen.getByLabelText(/托盘显示周期|System tray window/);
     expect(trayWindow).toHaveValue("seven_day");
     fireEvent.change(trayWindow, { target: { value: "five_hour" } });
@@ -280,38 +471,7 @@ describe("App", () => {
 
     act(() => modeHandler?.({ ...windowPreferences, mode: "compact" }));
     expect(screen.queryByRole("heading", { name: /设置|Settings/ })).not.toBeInTheDocument();
-    expect(screen.getByText("Codex")).toBeInTheDocument();
-  });
-
-  it("serializes rapid glass effect updates so the newest value wins", async () => {
-    let resolveFirst: ((value: WindowPreferences) => void) | undefined;
-    const saveWindowPreferences = vi
-      .fn()
-      .mockImplementationOnce(
-        (preferences: WindowPreferences) =>
-          new Promise<WindowPreferences>((resolve) => {
-            resolveFirst = () => resolve(preferences);
-          }),
-      )
-      .mockImplementation(async (preferences: WindowPreferences) => preferences);
-    render(<App {...defaults} saveWindowPreferences={saveWindowPreferences} />);
-    await screen.findAllByRole("progressbar");
-    fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
-    const glassEffect = screen.getByLabelText(/玻璃效果|Glass effect/);
-    fireEvent.change(glassEffect, { target: { value: "0.2" } });
-    fireEvent.change(glassEffect, { target: { value: "0.9" } });
-
-    await waitFor(() => expect(saveWindowPreferences).toHaveBeenCalledTimes(1));
-    expect(saveWindowPreferences).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({ glassLevel: 0.2 }),
-    );
-    await act(async () => resolveFirst?.(windowPreferences));
-    await waitFor(() => expect(saveWindowPreferences).toHaveBeenCalledTimes(2));
-    expect(saveWindowPreferences).toHaveBeenNthCalledWith(
-      2,
-      expect.objectContaining({ glassLevel: 0.9 }),
-    );
+    expect(screen.getByRole("status")).toHaveTextContent(/空闲|Idle/);
   });
 
   it("serializes rapid refresh setting updates without losing the newest state", async () => {
