@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.1"><img src="https://img.shields.io/badge/macOS-v1.2.1-111111?logo=apple" alt="macOS v1.2.1"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.0"><img src="https://img.shields.io/badge/macOS-v1.2.0-111111?logo=apple" alt="macOS v1.2.0"></a>
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@ The app detects whether the official account is using a subscription or API mode
 - See every active task separately instead of one merged status
 - Distinguish thinking, executing, waiting, completed, failed, and interrupted states
 - See task status, elapsed time, active task count, and remaining quota in the menu bar
-- Keep the five most recent completed tasks and reopen the matching Codex conversation
+- Open the matching Codex conversation from an active task or any of the five recent completions
 - Receive a local notification when a task finishes
 
 ### Plan around quota with less guesswork
@@ -59,7 +59,7 @@ The app detects whether the official account is using a subscription or API mode
 - Detailed and compact widgets with quick switching from the widget or tray
 - Manual refresh, configurable refresh interval, and quota alerts
 - Live local Codex task detection, elapsed time, five recent completions, and completion notifications
-- One-click navigation from a completed task to its Codex conversation
+- One-click navigation from active and recently completed tasks to their Codex conversations
 - Multiple active tasks displayed separately
 - Always on top, position lock, click-through, and launch at login
 - Windows 11 Mica, Windows 10 Acrylic, and a readable solid-color fallback
@@ -88,16 +88,16 @@ The app detects whether the official account is using a subscription or API mode
 
 | Platform                         | Status    | Version and download                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS 13+ Apple Silicon          | Available | [v1.2.1](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.1) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/TokenUsage_1.2.1_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/SHA256SUMS-1.2.1.txt)                                                                                                                                                                     |
 | Windows 11 / Windows 10 22H2 x64 | Available | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
-| macOS 13+ Apple Silicon          | Available | [v1.2.0](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.0) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0/TokenUsage_1.2.0_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0/SHA256SUMS-1.2.0.txt)                                                                                                                                                                     |
+
+### macOS v1.2.1
+
+Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/TokenUsage_1.2.1_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. v1.2.1 adds active-task conversation shortcuts and fixes transient recent-completion loss, reset-opportunity gaps, and disclosure-chevron movement. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
 ### Windows v1.1.5
 
 The Windows release supports x64 only. Prefer the MSI, or use the NSIS setup EXE. The installers are unsigned, so verify the published SHA-256 before using **More info → Run anyway** in SmartScreen. The embedded WebView2 bootstrapper starts Microsoft's installation flow if the runtime is missing. Uninstall from **Settings → Apps → Installed apps**. See the [Windows v1.1.5 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) for details.
-
-### macOS v1.2.0
-
-Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.0/TokenUsage_1.2.0_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. v1.2.0 adds account-mode detection, Credits and reset opportunities, live Codex task status, completion notifications, and conversation shortcuts. Incremental session-event reading reduces repeated background work. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
 ## Privacy
 

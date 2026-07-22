@@ -131,12 +131,56 @@ impl UsageClient {
         if !response.status().is_success() {
             return Ok(None);
         }
-        response
-            .json::<CodexResetCredits>()
+        let payload = response
+            .json::<serde_json::Value>()
             .await
-            .map(Some)
-            .map_err(|_| UsageError::ResponseIncompatible)
+            .map_err(|_| UsageError::ResponseIncompatible)?;
+        parse_reset_credits_payload(payload).map(Some)
     }
+}
+
+fn parse_reset_credits_payload(
+    payload: serde_json::Value,
+) -> Result<CodexResetCredits, UsageError> {
+    if let serde_json::Value::Array(credits) = payload {
+        let available_count = Some(serde_json::Value::from(credits.len()));
+        let credits = serde_json::from_value(serde_json::Value::Array(credits))
+            .map_err(|_| UsageError::ResponseIncompatible)?;
+        return Ok(CodexResetCredits {
+            available_count,
+            credits,
+        });
+    }
+
+    if let Some(object) = payload.as_object() {
+        let is_direct_payload = object.contains_key("available_count")
+            || object.contains_key("availableCount")
+            || object.contains_key("count")
+            || object.contains_key("credits")
+            || object
+                .get("reset_credits")
+                .is_some_and(serde_json::Value::is_array)
+            || object
+                .get("resetCredits")
+                .is_some_and(serde_json::Value::is_array);
+        if is_direct_payload {
+            return serde_json::from_value(payload).map_err(|_| UsageError::ResponseIncompatible);
+        }
+        for key in [
+            "rate_limit_reset_credits",
+            "reset_credits",
+            "resetCredits",
+            "data",
+        ] {
+            if let Some(nested) = object.get(key) {
+                if nested.is_object() || nested.is_array() {
+                    return parse_reset_credits_payload(nested.clone());
+                }
+            }
+        }
+    }
+
+    serde_json::from_value(payload).map_err(|_| UsageError::ResponseIncompatible)
 }
 
 fn normalize(body: CodexUsageResponse) -> Result<UsageSnapshot, UsageError> {
@@ -307,6 +351,34 @@ mod tests {
         assert_eq!(resets.available_count, 3);
         assert_eq!(resets.credits.len(), 1);
         assert_eq!(resets.credits[0].expires_at, Some(1_911_772_800));
+    }
+
+    #[test]
+    fn parses_wrapped_reset_credit_details() {
+        let resets = parse_reset_credits_payload(serde_json::json!({
+            "data": {
+                "availableCount": 2,
+                "resetCredits": [{
+                    "id": "reset-1",
+                    "title": "Full reset",
+                    "expires_at": 2_000_000_000
+                }]
+            }
+        }))
+        .expect("wrapped reset credits");
+        assert_eq!(resets.available_count, Some(serde_json::json!(2)));
+        assert_eq!(resets.credits.len(), 1);
+    }
+
+    #[test]
+    fn parses_bare_reset_credit_array() {
+        let resets = parse_reset_credits_payload(serde_json::json!([{
+            "id": "reset-1",
+            "title": "Full reset"
+        }]))
+        .expect("reset credit array");
+        assert_eq!(resets.available_count, Some(serde_json::json!(1)));
+        assert_eq!(resets.credits.len(), 1);
     }
 
     #[tokio::test]
