@@ -2,7 +2,7 @@
 set -euo pipefail
 ROOT="${0:A:h:h}"
 APP="$ROOT/src-tauri/target/release/bundle/macos/Token用量.app"
-OUT="$ROOT/src-tauri/target/release/bundle/dmg/TokenUsage_1.2.0-beta.14_arm64.dmg"
+OUT="$ROOT/src-tauri/target/release/bundle/dmg/TokenUsage_1.2.0_arm64.dmg"
 [ -d "$APP" ] || { echo "Missing app bundle: $APP" >&2; exit 1; }
 # Finder metadata can invalidate ad-hoc signing on locally generated bundles.
 xattr -cr "$APP" 2>/dev/null || true
@@ -15,7 +15,7 @@ trap 'rm -rf "$STAGE"' EXIT
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 cat > "$STAGE/安装说明.txt" <<'EOF'
-Token用量 1.2.0-beta.14 测试版安装说明
+Token用量 1.2.0 安装说明
 
 1. 将“Token用量.app”拖入 Applications 文件夹。
 2. 首次打开时，如果 macOS 提示无法验证开发者：
