@@ -2,19 +2,54 @@ mod credentials;
 mod error;
 mod model;
 mod refresh;
+mod tasks;
 mod tray;
 mod usage;
 mod window;
 
-use credentials::CredentialReport;
+use credentials::{AccountModeReport, CredentialReport};
 use error::UsageErrorPayload;
 use refresh::{RefreshCoordinator, RefreshSettings, UsageView};
 use tauri::{Manager, State};
 use window::WindowPreferences;
 
 #[tauri::command]
+fn get_tasks(monitor: State<'_, tasks::TaskMonitor>) -> tasks::TaskSnapshot {
+    monitor.snapshot()
+}
+
+#[tauri::command]
+fn open_codex_thread(session_id: String) -> Result<(), UsageErrorPayload> {
+    if session_id.is_empty()
+        || session_id.len() > 64
+        || !session_id
+            .chars()
+            .all(|character| character.is_ascii_hexdigit() || character == '-')
+    {
+        return Err(UsageErrorPayload::from(error::UsageError::InvalidSettings));
+    }
+    let url = format!("codex://threads/{session_id}");
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(&url).spawn();
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("rundll32")
+        .args(["url.dll,FileProtocolHandler", &url])
+        .spawn();
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let result = std::process::Command::new("xdg-open").arg(&url).spawn();
+    result
+        .map(|_| ())
+        .map_err(|_| UsageErrorPayload::from(error::UsageError::WindowUnavailable))
+}
+
+#[tauri::command]
 fn credential_status() -> CredentialReport {
     credentials::inspect_credentials()
+}
+
+#[tauri::command]
+fn account_mode() -> AccountModeReport {
+    credentials::inspect_account_mode()
 }
 
 #[tauri::command]
@@ -209,6 +244,8 @@ pub fn run() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let coordinator = RefreshCoordinator::load(app.handle());
             app.manage(coordinator.clone());
+            let task_monitor = tasks::TaskMonitor::default();
+            app.manage(task_monitor.clone());
             tray::setup(app, coordinator.clone())?;
             let preferences = window::load_preferences(app.handle());
             let initial_view = match preferences.mode {
@@ -227,10 +264,14 @@ pub fn run() {
                 });
             }
             coordinator.start(app.handle().clone());
+            task_monitor.start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             credential_status,
+            account_mode,
+            get_tasks,
+            open_codex_thread,
             get_usage,
             refresh_usage,
             get_refresh_settings,

@@ -12,7 +12,22 @@ import {
   type RefreshSettings,
   type UsageView,
 } from "./usage";
-import { enableUsage, ensureNotificationPermission, getAutostart, setAutostart } from "./system";
+import {
+  enableUsage,
+  ensureNotificationPermission,
+  getAccountMode,
+  getAutostart,
+  setAutostart,
+  type AccountMode,
+} from "./system";
+import {
+  getTasks,
+  openCodexThread,
+  onTasksUpdated,
+  type CodexTask,
+  type TaskSnapshot,
+  type TaskStatus,
+} from "./tasks";
 import {
   getBackdropTone,
   getWindowPreferences,
@@ -30,7 +45,8 @@ const defaultWindowPreferences: WindowPreferences = {
   alwaysOnTop: true,
   locked: false,
   clickThrough: false,
-  glassLevel: 0.5,
+  showDockIcon: false,
+  glassLevel: 1,
 };
 
 const defaultRefreshSettings: RefreshSettings = {
@@ -42,6 +58,32 @@ const defaultRefreshSettings: RefreshSettings = {
   notifyHundred: true,
   notifyReset: false,
 };
+
+const emptyTaskSnapshot = (): TaskSnapshot => ({ tasks: [], queriedAt: Date.now() });
+
+async function loadTasksSafely() {
+  try {
+    return await getTasks();
+  } catch {
+    return emptyTaskSnapshot();
+  }
+}
+
+async function subscribeTasksSafely(handler: (snapshot: TaskSnapshot) => void) {
+  try {
+    return await onTasksUpdated(handler);
+  } catch {
+    return () => undefined;
+  }
+}
+
+async function loadAccountModeSafely(): Promise<{ mode: AccountMode }> {
+  try {
+    return await getAccountMode();
+  } catch {
+    return { mode: "signed_out" };
+  }
+}
 
 interface AppProps {
   loadUsage?: () => Promise<UsageView>;
@@ -67,6 +109,10 @@ interface AppProps {
   resizeView?: (view: "compact" | "detailed" | "settings") => Promise<void>;
   detectBackdrop?: () => Promise<BackdropTone>;
   backdropPollIntervalMs?: number;
+  loadTasks?: () => Promise<TaskSnapshot>;
+  subscribeTasks?: (handler: (snapshot: TaskSnapshot) => void) => Promise<() => void>;
+  loadAccountMode?: () => Promise<{ mode: AccountMode }>;
+  openTask?: (sessionId: string) => Promise<void>;
 }
 
 function remainingPercent(usedPercent: number) {
@@ -85,6 +131,19 @@ function windowShortLabel(id: string) {
   if (id === "seven_day") return "7d";
   if (id === "thirty_day") return "30d";
   return id;
+}
+
+function isTaskActive(status: TaskStatus) {
+  return status === "thinking" || status === "executing" || status === "waiting";
+}
+
+function durationLabel(start: number, end: number) {
+  const seconds = Math.max(0, Math.floor((end - start) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  return minutes < 60
+    ? `${minutes}m ${seconds % 60}s`
+    : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
 export default function App({
@@ -106,14 +165,18 @@ export default function App({
   authorizeUsage = enableUsage,
   resizeView = resizeWindowForView,
   detectBackdrop = getBackdropTone,
-  backdropPollIntervalMs = 350,
+  backdropPollIntervalMs = 1500,
+  loadTasks = loadTasksSafely,
+  subscribeTasks = subscribeTasksSafely,
+  loadAccountMode = loadAccountModeSafely,
+  openTask = openCodexThread,
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
   const [settings, setSettings] = useState<RefreshSettings>(defaultRefreshSettings);
   const [autostart, setAutostartValue] = useState(false);
   const [appVersion, setAppVersion] = useState("1.1.5");
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setRefreshing] = useState(false);
   const [preferences, setPreferences] = useState(defaultWindowPreferences);
   const [screen, setScreen] = useState<"meter" | "settings">("meter");
   const preferencesRef = useRef(defaultWindowPreferences);
@@ -124,6 +187,12 @@ export default function App({
   const settingsSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [saveError, setSaveError] = useState(false);
   const [backdropTone, setBackdropTone] = useState<BackdropTone>("light");
+  const [tasks, setTasks] = useState<TaskSnapshot>({ tasks: [], queriedAt: Date.now() });
+  const [clock, setClock] = useState(Date.now());
+  const [accountMode, setAccountMode] = useState<AccountMode>("signed_out");
+  // Keep this above the detailed/compact branches so changing views does not
+  // recreate the disclosure and discard the user's choice.
+  const [resetsExpanded, setResetsExpanded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -170,6 +239,8 @@ export default function App({
     });
     void loadAutostart().then(setAutostartValue);
     void loadAppVersion().then(setAppVersion);
+    void loadTasks().then(setTasks);
+    void loadAccountMode().then((report) => setAccountMode(report.mode));
     void loadWindowPreferences().then((next) => {
       preferencesRef.current = next;
       persistedPreferencesRef.current = next;
@@ -180,6 +251,7 @@ export default function App({
     let unlistenSettings: (() => void) | undefined;
     let unlistenWindow: (() => void) | undefined;
     let unlistenMode: (() => void) | undefined;
+    let unlistenTasks: (() => void) | undefined;
     void subscribe(setView).then((cleanup) => (active ? (unlisten = cleanup) : cleanup()));
     void subscribeSettings((next) => {
       settingsRef.current = next;
@@ -197,12 +269,16 @@ export default function App({
       setPreferences(next);
       setScreen("meter");
     }).then((cleanup) => (active ? (unlistenMode = cleanup) : cleanup()));
+    void subscribeTasks(setTasks).then((cleanup) =>
+      active ? (unlistenTasks = cleanup) : cleanup(),
+    );
     return () => {
       active = false;
       unlisten?.();
       unlistenSettings?.();
       unlistenWindow?.();
       unlistenMode?.();
+      unlistenTasks?.();
     };
   }, [
     loadAutostart,
@@ -210,11 +286,19 @@ export default function App({
     loadSettings,
     loadUsage,
     loadWindowPreferences,
+    loadTasks,
+    loadAccountMode,
     subscribe,
     subscribeSettings,
     subscribeWindowPreferences,
     subscribeWindowModeChanged,
+    subscribeTasks,
   ]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -302,6 +386,13 @@ export default function App({
   const textToneClass = `backdrop-${backdropTone}`;
   const platformClass = navigator.userAgent.includes("Windows") ? "platform-windows" : "";
   const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
+  const activeTasks = tasks.tasks.filter((task) => isTaskActive(task.status));
+  const primaryTask = activeTasks[0];
+  const recentCompletion = tasks.tasks.find(
+    (task) => task.status === "completed" && clock - (task.completedAt ?? task.updatedAt) < 15_000,
+  );
+  const displayTask = primaryTask ?? recentCompletion;
+  const displayStatus: TaskStatus = displayTask?.status ?? "unknown";
 
   const openSettings = () => {
     setScreen("settings");
@@ -325,11 +416,27 @@ export default function App({
   if (compact) {
     return (
       <main className={`app-shell compact-shell ${textToneClass} ${platformClass}`}>
-        <section className="liquid-panel compact-panel" onMouseDown={drag}>
-          <strong className="brand-word">Codex</strong>
+        <section
+          className={`liquid-panel compact-panel status-${displayStatus}`}
+          onMouseDown={drag}
+        >
+          <div className="compact-primary" role="status" aria-live="polite">
+            <span className="status-signal" aria-hidden="true" />
+            <div className="compact-status-copy">
+              <strong>{t(`taskStatus.${displayStatus}`)}</strong>
+              <span>
+                {displayTask
+                  ? durationLabel(displayTask.startedAt, displayTask.completedAt ?? clock)
+                  : t("readyForTask")}
+              </span>
+            </div>
+          </div>
+          {activeTasks.length > 1 && (
+            <span className="compact-task-count">+{activeTasks.length - 1}</span>
+          )}
           {!settings.usageEnabled ? (
             <button
-              className="compact-state-button"
+              className="compact-quota-button"
               type="button"
               onMouseDown={(event) => event.stopPropagation()}
               onClick={() => void authorize()}
@@ -337,32 +444,19 @@ export default function App({
               {t("compactEnable")}
             </button>
           ) : view.status === "loading" ? (
-            <span className="compact-state" role="status">
-              {t("compactLoading")}
-            </span>
+            <span className="compact-quota">{t("compactLoading")}</span>
           ) : view.status === "error" ? (
             <button
-              className="compact-state-button risk-text-critical"
+              className="compact-quota-button risk-text-critical"
               type="button"
               onMouseDown={(event) => event.stopPropagation()}
               onClick={() => void refresh()}
             >
               {t("compactRetry")}
             </button>
-          ) : (
-            readyWindows.map((window, index) => {
-              const remaining = remainingPercent(window.usedPercent);
-              return (
-                <span className="compact-metric" key={window.id}>
-                  {index > 0 && <span className="metric-dot">·</span>}
-                  <span className="metric-label">{windowShortLabel(window.id)}</span>
-                  <strong className={`metric-value risk-text-${riskClass(remaining)}`}>
-                    {remaining}%
-                  </strong>
-                </span>
-              );
-            })
-          )}
+          ) : readyWindows[0] ? (
+            <span className="compact-quota">{`${windowShortLabel(readyWindows[0].id)} ${remainingPercent(readyWindows[0].usedPercent)}%`}</span>
+          ) : null}
           <button
             className="compact-mode-toggle"
             type="button"
@@ -386,7 +480,16 @@ export default function App({
     >
       <section className="liquid-panel">
         <header className="titlebar" onMouseDown={drag}>
-          <h1>{screen === "settings" ? t("settingsTitle") : t("meterTitle")}</h1>
+          <div className="title-identity">
+            <h1>{screen === "settings" ? t("settingsTitle") : t("meterTitle")}</h1>
+            {screen !== "settings" && (
+              <span className={`account-mode mode-${accountMode}`}>
+                {accountMode === "subscription" && view.status === "ready" && view.snapshot.planType
+                  ? t("subscriptionMode", { plan: view.snapshot.planType.toUpperCase() })
+                  : t(`accountMode.${accountMode}`)}
+              </span>
+            )}
+          </div>
           <div className="title-actions" onMouseDown={(event) => event.stopPropagation()}>
             {screen === "settings" ? (
               <button className="text-action" type="button" onClick={() => void closeSettings()}>
@@ -394,14 +497,6 @@ export default function App({
               </button>
             ) : (
               <>
-                <button
-                  className="text-action"
-                  disabled={refreshing}
-                  onClick={() => void refresh()}
-                  type="button"
-                >
-                  {refreshing ? t("refreshing") : t("refresh")}
-                </button>
                 <button
                   className="icon-action mode-toggle-action"
                   type="button"
@@ -440,29 +535,6 @@ export default function App({
                   ["detailed", t("detailed")],
                 ]}
               />
-              <label className="setting-row glass-level-row">
-                <span>{t("glassEffect")}</span>
-                <span className="glass-level-control">
-                  <input
-                    aria-label={t("glassEffect")}
-                    aria-valuetext={t("glassEffectValue", {
-                      value: Math.round(preferences.glassLevel * 100),
-                    })}
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    type="range"
-                    value={preferences.glassLevel}
-                    onChange={(event) =>
-                      void updatePreferences({ glassLevel: Number(event.target.value) })
-                    }
-                  />
-                  <span className="glass-level-scale" aria-hidden="true">
-                    <span>{t("clear")}</span>
-                    <span>{t("standard")}</span>
-                  </span>
-                </span>
-              </label>
               <ToggleRow
                 label={t("alwaysOnTop")}
                 checked={preferences.alwaysOnTop}
@@ -530,6 +602,11 @@ export default function App({
             </SettingsGroup>
             <SettingsGroup title={t("systemGroup")}>
               <ToggleRow
+                label={t("showDockIcon")}
+                checked={preferences.showDockIcon}
+                onChange={(checked) => void updatePreferences({ showDockIcon: checked })}
+              />
+              <ToggleRow
                 label={t("launchAtLogin")}
                 checked={autostart}
                 onChange={(checked) => {
@@ -561,19 +638,197 @@ export default function App({
             </div>
           </div>
         ) : (
-          <MeterContent
+          <DashboardContent
             view={view}
             usageEnabled={settings.usageEnabled}
-            stale={view.status === "ready" && view.stale}
-            intervalMinutes={settings.intervalMinutes}
+            tasks={tasks}
+            now={clock}
             locale={i18n.language}
+            intervalMinutes={settings.intervalMinutes}
             onRefresh={refresh}
             onAuthorize={authorize}
             t={t}
+            accountMode={accountMode}
+            onOpenTask={openTask}
+            resetsExpanded={resetsExpanded}
+            onResetsExpandedChange={setResetsExpanded}
           />
         )}
       </section>
     </main>
+  );
+}
+
+function DashboardContent({
+  view,
+  usageEnabled,
+  tasks,
+  now,
+  locale,
+  intervalMinutes,
+  onRefresh,
+  onAuthorize,
+  t,
+  accountMode,
+  resetsExpanded,
+  onResetsExpandedChange,
+  onOpenTask,
+}: {
+  view: UsageView;
+  usageEnabled: boolean;
+  tasks: TaskSnapshot;
+  now: number;
+  locale: string;
+  intervalMinutes: number;
+  onRefresh: () => Promise<void>;
+  onAuthorize: () => Promise<void>;
+  t: ReturnType<typeof useTranslation>["t"];
+  accountMode: AccountMode;
+  resetsExpanded: boolean;
+  onResetsExpandedChange: (expanded: boolean) => void;
+  onOpenTask: (sessionId: string) => Promise<void>;
+}) {
+  const [activeTab, setActiveTab] = useState<"usage" | "tasks">("usage");
+  const active = tasks.tasks.filter((task) => isTaskActive(task.status));
+  const primary = active[0];
+  const justCompleted = tasks.tasks.find(
+    (task) => task.status === "completed" && now - (task.completedAt ?? task.updatedAt) < 15_000,
+  );
+  const featuredTask = primary ?? justCompleted;
+  const recent = tasks.tasks
+    .filter((task) => task.status === "completed")
+    .sort(
+      (left, right) =>
+        (right.completedAt ?? right.updatedAt) - (left.completedAt ?? left.updatedAt),
+    )
+    .slice(0, 5);
+  return (
+    <div className="dashboard-content">
+      <nav className="meter-tabs" aria-label={t("overviewTabs")}>
+        <button
+          className={activeTab === "usage" ? "active" : ""}
+          type="button"
+          aria-selected={activeTab === "usage"}
+          onClick={() => setActiveTab("usage")}
+        >
+          {t("usageTab")}
+        </button>
+        <button
+          className={activeTab === "tasks" ? "active" : ""}
+          type="button"
+          aria-selected={activeTab === "tasks"}
+          onClick={() => setActiveTab("tasks")}
+        >
+          {active.length > 0 && <span className="live-dot" aria-hidden="true" />}
+          {t("tasksTab")}
+          {active.length > 0 && <span className="task-count">{active.length}</span>}
+        </button>
+      </nav>
+      {activeTab === "usage" ? (
+        <MeterContent
+          view={view}
+          usageEnabled={usageEnabled}
+          stale={view.status === "ready" && view.stale}
+          intervalMinutes={intervalMinutes}
+          locale={locale}
+          onRefresh={onRefresh}
+          onAuthorize={onAuthorize}
+          t={t}
+          accountMode={accountMode}
+          resetsExpanded={resetsExpanded}
+          onResetsExpandedChange={onResetsExpandedChange}
+        />
+      ) : (
+        <TaskTabContent
+          activeTasks={active}
+          fallbackTask={featuredTask}
+          recent={recent}
+          now={now}
+          locale={locale}
+          t={t}
+          onOpenTask={onOpenTask}
+        />
+      )}
+    </div>
+  );
+}
+
+function TaskTabContent({
+  activeTasks,
+  fallbackTask,
+  recent,
+  now,
+  locale,
+  t,
+  onOpenTask,
+}: {
+  activeTasks: CodexTask[];
+  fallbackTask?: CodexTask;
+  recent: CodexTask[];
+  now: number;
+  locale: string;
+  t: ReturnType<typeof useTranslation>["t"];
+  onOpenTask: (sessionId: string) => Promise<void>;
+}) {
+  return (
+    <div className="task-tab-content">
+      <div className="active-task-list" aria-label={t("activeTasks")}>
+        {activeTasks.length > 0 ? (
+          activeTasks.map((task) => <StatusHero key={task.id} task={task} now={now} t={t} />)
+        ) : (
+          <StatusHero task={fallbackTask} now={now} t={t} />
+        )}
+      </div>
+      {recent.length > 0 && (
+        <section className="recent-strip" aria-label={t("recentTasks")}>
+          <h2>{t("recentTasks")}</h2>
+          {recent.map((item) => (
+            <button
+              className={`recent-row status-${item.status}`}
+              key={item.id}
+              type="button"
+              disabled={!item.sessionId}
+              aria-label={`${item.title} · ${t("openTask")}`}
+              title={t("openTask")}
+              onClick={() => item.sessionId && void onOpenTask(item.sessionId)}
+            >
+              <span className="recent-state">{t(`taskStatus.${item.status}`)}</span>
+              <strong>{item.title}</strong>
+              <time>
+                {new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(
+                  new Date(item.completedAt ?? item.updatedAt),
+                )}
+              </time>
+            </button>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function StatusHero({
+  task,
+  now,
+  t,
+}: {
+  task?: CodexTask;
+  now: number;
+  t: ReturnType<typeof useTranslation>["t"];
+}) {
+  const status = task?.status ?? "unknown";
+  return (
+    <section className={`status-hero status-${status}`} aria-live="polite">
+      <span className="status-signal" aria-hidden="true" />
+      <div className="status-hero-copy">
+        <div className="status-line">
+          <strong>{t(`taskStatus.${status}`)}</strong>
+          {task && <time>{durationLabel(task.startedAt, now)}</time>}
+        </div>
+        <p>{task?.title ?? t("tasksIdleHint")}</p>
+        {task && <small>{task.project}</small>}
+      </div>
+    </section>
   );
 }
 
@@ -586,6 +841,9 @@ function MeterContent({
   onRefresh,
   onAuthorize,
   t,
+  accountMode,
+  resetsExpanded,
+  onResetsExpandedChange,
 }: {
   view: UsageView;
   usageEnabled: boolean;
@@ -595,6 +853,9 @@ function MeterContent({
   onRefresh: () => Promise<void>;
   onAuthorize: () => Promise<void>;
   t: ReturnType<typeof useTranslation>["t"];
+  accountMode: AccountMode;
+  resetsExpanded: boolean;
+  onResetsExpandedChange: (expanded: boolean) => void;
 }) {
   if (!usageEnabled)
     return (
@@ -607,6 +868,13 @@ function MeterContent({
       </div>
     );
   if (view.status === "loading") return <p className="status-message">{t("loading")}</p>;
+  if (view.status === "error" && accountMode === "api")
+    return (
+      <div className="state-card api-mode-state">
+        <strong>{t("accountMode.api")}</strong>
+        <p>{t("apiUsageUnavailable")}</p>
+      </div>
+    );
   if (view.status === "error")
     return (
       <div className="state-card error-state" role="alert">
@@ -647,11 +915,12 @@ function MeterContent({
                 {window.resetAt && (
                   <span>
                     {t("resetsShort", {
-                      value: new Date(window.resetAt * 1000).toLocaleString([], {
-                        weekday: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      }),
+                      value: new Date(window.resetAt * 1000).toLocaleString(
+                        locale,
+                        window.id === "five_hour"
+                          ? { weekday: "short", hour: "2-digit", minute: "2-digit" }
+                          : { month: "numeric", day: "numeric" },
+                      ),
                     })}
                   </span>
                 )}
@@ -660,6 +929,75 @@ function MeterContent({
           );
         })}
       </div>
+      {view.snapshot.resetCredits && view.snapshot.resetCredits.availableCount > 0 && (
+        <section className="reset-credits" aria-label={t("resetCreditsTitle")}>
+          <button
+            className="reset-credits-heading"
+            type="button"
+            aria-expanded={resetsExpanded}
+            onClick={() => onResetsExpandedChange(!resetsExpanded)}
+          >
+            <strong>{t("resetCreditsTitle")}</strong>
+            <span className="reset-heading-actions">
+              <span>
+                {t("resetCreditsAvailable", {
+                  count: view.snapshot.resetCredits.availableCount,
+                })}
+              </span>
+              <span className="reset-chevron" aria-hidden="true">
+                {resetsExpanded ? "⌃" : "⌄"}
+              </span>
+            </span>
+          </button>
+          {resetsExpanded && view.snapshot.resetCredits.credits.length > 0 && (
+            <div className="reset-credit-list">
+              {view.snapshot.resetCredits.credits.map((credit, index) => (
+                <article className="reset-credit-row" key={credit.id ?? `${index}`}>
+                  <div>
+                    <strong>{credit.title || t("fullReset")}</strong>
+                    {credit.expiresAt && (
+                      <span>
+                        {t("resetCreditExpires", {
+                          value: new Date(credit.expiresAt * 1000).toLocaleDateString(locale, {
+                            month: "numeric",
+                            day: "numeric",
+                          }),
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  <span className="reset-credit-status">{t("available")}</span>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      {accountMode === "api" && view.snapshot.credits && (
+        <section className="credits-card" aria-label={t("creditsTitle")}>
+          <div>
+            <span>{t("creditsTitle")}</span>
+            <strong>
+              {view.snapshot.credits?.unlimited
+                ? t("creditsUnlimited")
+                : view.snapshot.credits?.hasCredits
+                  ? t("creditsBalance", {
+                      value: view.snapshot.credits.balance ?? t("creditsAvailable"),
+                    })
+                  : t("creditsNotEnabled")}
+            </strong>
+          </div>
+          <div className="credits-meta">
+            <span>
+              {view.snapshot.credits?.expiresAt
+                ? t("creditsExpire", {
+                    value: new Date(view.snapshot.credits.expiresAt * 1000).toLocaleDateString(),
+                  })
+                : t("creditsExpiryUnavailable")}
+            </span>
+          </div>
+        </section>
+      )}
       <footer>
         {t("updatedAt", {
           value: new Intl.DateTimeFormat(locale, {

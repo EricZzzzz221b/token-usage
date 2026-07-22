@@ -378,6 +378,9 @@ mod tests {
             settings: RefreshSettings::default(),
             last_good: Some(UsageSnapshot {
                 source: "codex_oauth".into(),
+                plan_type: None,
+                credits: None,
+                reset_credits: None,
                 windows: vec![UsageWindow {
                     id: "five_hour".into(),
                     label: "5 hours".into(),

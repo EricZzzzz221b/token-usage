@@ -1,3 +1,4 @@
+use std::sync::{Mutex, OnceLock};
 use tauri::{
     image::Image,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -6,6 +7,7 @@ use tauri::{
 };
 
 use crate::refresh::{RefreshCoordinator, TrayWindow, UsageView};
+use crate::tasks::{is_active, TaskMonitor, TaskStatus};
 
 const TRAY_ID: &str = "token-usage";
 const SUMMARY_ID: &str = "usage-summary";
@@ -16,6 +18,7 @@ const INTERACTION_ID: &str = "restore-interaction";
 const FIVE_HOUR_ID: &str = "tray-five-hour";
 const SEVEN_DAY_ID: &str = "tray-seven-day";
 const QUIT_ID: &str = "quit";
+static MENU_SNAPSHOT: OnceLock<Mutex<Option<(String, TrayWindow)>>> = OnceLock::new();
 
 pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()> {
     let menu = build_menu(app, "正在读取用量…", TrayWindow::FiveHour)?;
@@ -75,11 +78,57 @@ pub fn update(app: &AppHandle, view: &UsageView, tray_window: TrayWindow) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return;
     };
-    let (title, tooltip, summary) = tray_text(view, tray_window);
+    let (mut title, mut tooltip, summary) = tray_text(view, tray_window);
+    let task_snapshot = app.state::<TaskMonitor>().snapshot();
+    let active_tasks = task_snapshot
+        .tasks
+        .iter()
+        .filter(|task| is_active(&task.status))
+        .collect::<Vec<_>>();
+    if let Some(task) = active_tasks.first() {
+        let status = &task.status;
+        let status_text = match status {
+            TaskStatus::Thinking => "思考中",
+            TaskStatus::Executing => "执行中",
+            TaskStatus::Waiting => "需要操作",
+            TaskStatus::Completed => "已完成",
+            TaskStatus::Failed => "失败",
+            TaskStatus::Interrupted => "已中断",
+            TaskStatus::Unknown => "空闲",
+        };
+        let count = if active_tasks.len() > 1 {
+            format!(" · {} 个任务", active_tasks.len())
+        } else {
+            String::new()
+        };
+        let elapsed = elapsed_label(task.started_at);
+        title = format!("{status_text}{elapsed} · {title}");
+        tooltip = format!("Codex {status_text}{elapsed}{count} · {tooltip}");
+    }
     let _ = tray.set_title(Some(title));
     let _ = tray.set_tooltip(Some(tooltip));
-    if let Ok(menu) = build_menu(app, &summary, tray_window) {
-        let _ = tray.set_menu(Some(menu));
+    let menu_snapshot = MENU_SNAPSHOT.get_or_init(|| Mutex::new(None));
+    if let Ok(mut previous) = menu_snapshot.lock() {
+        let next = (summary.clone(), tray_window);
+        if previous.as_ref() != Some(&next) {
+            if let Ok(menu) = build_menu(app, &summary, tray_window) {
+                let _ = tray.set_menu(Some(menu));
+                *previous = Some(next);
+            }
+        }
+    }
+}
+
+fn elapsed_label(started_at: i64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    let minutes = now.saturating_sub(started_at) / 60_000;
+    if minutes < 60 {
+        format!(" {}m", minutes.max(0))
+    } else {
+        format!(" {}h {}m", minutes / 60, minutes % 60)
     }
 }
 
@@ -204,6 +253,9 @@ mod tests {
             snapshot: UsageSnapshot {
                 source: "codex_oauth".into(),
                 queried_at: 1,
+                plan_type: None,
+                credits: None,
+                reset_credits: None,
                 windows: vec![
                     UsageWindow {
                         id: "five_hour".into(),

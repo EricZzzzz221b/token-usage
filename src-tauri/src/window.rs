@@ -19,12 +19,14 @@ pub struct WindowPreferences {
     pub always_on_top: bool,
     pub locked: bool,
     pub click_through: bool,
+    #[serde(default)]
+    pub show_dock_icon: bool,
     #[serde(default = "default_glass_level")]
     pub glass_level: f64,
 }
 
 fn default_glass_level() -> f64 {
-    0.5
+    1.0
 }
 
 impl Default for WindowPreferences {
@@ -34,6 +36,7 @@ impl Default for WindowPreferences {
             always_on_top: true,
             locked: false,
             click_through: false,
+            show_dock_icon: false,
             glass_level: default_glass_level(),
         }
     }
@@ -45,11 +48,13 @@ pub fn main_window(app: &AppHandle) -> Result<WebviewWindow, UsageError> {
 }
 
 pub fn load_preferences(app: &AppHandle) -> WindowPreferences {
-    fs::read_to_string(preferences_path(app))
+    let mut preferences = fs::read_to_string(preferences_path(app))
         .ok()
         .and_then(|value| serde_json::from_str(&value).ok())
         .filter(valid_preferences)
-        .unwrap_or_default()
+        .unwrap_or_default();
+    preferences.glass_level = default_glass_level();
+    preferences
 }
 
 pub fn save_preferences(
@@ -63,7 +68,9 @@ pub fn save_preferences(
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|_| UsageError::WindowSettingsUnavailable)?;
     }
-    let bytes = serde_json::to_vec_pretty(preferences)
+    let mut normalized = preferences.clone();
+    normalized.glass_level = default_glass_level();
+    let bytes = serde_json::to_vec_pretty(&normalized)
         .map_err(|_| UsageError::WindowSettingsUnavailable)?;
     fs::write(path, bytes).map_err(|_| UsageError::WindowSettingsUnavailable)
 }
@@ -75,6 +82,12 @@ pub fn apply_preferences(
     if !valid_preferences(preferences) {
         return Err(UsageError::InvalidSettings);
     }
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(if preferences.show_dock_icon {
+        tauri::ActivationPolicy::Regular
+    } else {
+        tauri::ActivationPolicy::Accessory
+    });
     let window = main_window(app)?;
     window
         .set_always_on_top(preferences.always_on_top)
@@ -82,19 +95,19 @@ pub fn apply_preferences(
     window
         .set_ignore_cursor_events(preferences.click_through)
         .map_err(|_| UsageError::WindowUnavailable)?;
-    apply_glass(app, preferences.glass_level)
+    apply_glass(app, default_glass_level())
 }
 
 pub fn resize_for_view(app: &AppHandle, view: &str) -> Result<(), UsageError> {
     let (width, height, radius) = match view {
         #[cfg(target_os = "windows")]
-        "compact" => (340.0, 52.0, 12.0),
+        "compact" => (350.0, 60.0, 14.0),
         #[cfg(not(target_os = "windows"))]
-        "compact" => (320.0, 48.0, 17.0),
+        "compact" => (330.0, 58.0, 18.0),
         #[cfg(target_os = "windows")]
-        "detailed" => (380.0, 258.0, 14.0),
+        "detailed" => (400.0, 430.0, 16.0),
         #[cfg(not(target_os = "windows"))]
-        "detailed" => (360.0, 237.0, 22.0),
+        "detailed" => (380.0, 420.0, 24.0),
         #[cfg(target_os = "windows")]
         "settings" => (500.0, 720.0, 16.0),
         #[cfg(not(target_os = "windows"))]
@@ -104,8 +117,7 @@ pub fn resize_for_view(app: &AppHandle, view: &str) -> Result<(), UsageError> {
     main_window(app)?
         .set_size(tauri::LogicalSize::new(width, height))
         .map_err(|_| UsageError::WindowUnavailable)?;
-    let preferences = load_preferences(app);
-    apply_glass_with_radius(app, preferences.glass_level, radius)
+    apply_glass_with_radius(app, default_glass_level(), radius)
 }
 
 pub fn apply_glass(app: &AppHandle, glass_level: f64) -> Result<(), UsageError> {
@@ -252,11 +264,11 @@ mod tests {
     }
 
     #[test]
-    fn migrates_legacy_glass_settings_to_center() {
+    fn legacy_settings_default_to_standard_glass() {
         let decoded: WindowPreferences = serde_json::from_str(
             r#"{"mode":"detailed","alwaysOnTop":true,"locked":false,"clickThrough":false,"opacity":0.8,"glassStrength":"rich"}"#,
         )
         .expect("deserialize legacy preferences");
-        assert_eq!(decoded.glass_level, 0.5);
+        assert_eq!(decoded.glass_level, 1.0);
     }
 }

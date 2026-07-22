@@ -44,6 +44,21 @@ pub struct CredentialReport {
     pub source: CredentialSource,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AccountMode {
+    Subscription,
+    Api,
+    Other,
+    SignedOut,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountModeReport {
+    pub mode: AccountMode,
+}
+
 #[derive(Debug, Deserialize)]
 struct CodexAuthJson {
     auth_mode: Option<String>,
@@ -82,16 +97,35 @@ pub fn inspect_credentials() -> CredentialReport {
     }
 }
 
+pub fn inspect_account_mode() -> AccountModeReport {
+    let mode = read_auth_content_with_source()
+        .ok()
+        .and_then(|(content, _)| serde_json::from_str::<CodexAuthJson>(&content).ok())
+        .map(|auth| match auth.auth_mode.as_deref() {
+            Some("chatgpt") => AccountMode::Subscription,
+            Some("apikey") | Some("api_key") => AccountMode::Api,
+            Some(_) => AccountMode::Other,
+            None => AccountMode::SignedOut,
+        })
+        .unwrap_or(AccountMode::SignedOut);
+    AccountModeReport { mode }
+}
+
 pub(crate) fn read_credentials() -> Result<OAuthCredentials, UsageError> {
     read_credentials_with_source().map(|(credentials, _, _)| credentials)
 }
 
 fn read_credentials_with_source() -> Result<(OAuthCredentials, CredentialSource, bool), UsageError>
 {
+    let (content, source) = read_auth_content_with_source()?;
+    let (credentials, stale) = parse_credentials(&content)?;
+    Ok((credentials, source, stale))
+}
+
+fn read_auth_content_with_source() -> Result<(String, CredentialSource), UsageError> {
     #[cfg(target_os = "macos")]
     if let Some(content) = read_keychain_entry() {
-        let (credentials, stale) = parse_credentials(&content)?;
-        return Ok((credentials, CredentialSource::Keychain, stale));
+        return Ok((content, CredentialSource::Keychain));
     }
 
     let path = codex_auth_path();
@@ -99,8 +133,7 @@ fn read_credentials_with_source() -> Result<(OAuthCredentials, CredentialSource,
         return Err(UsageError::NotLoggedIn);
     }
     let content = fs::read_to_string(path).map_err(|_| UsageError::CredentialUnreadable)?;
-    let (credentials, stale) = parse_credentials(&content)?;
-    Ok((credentials, CredentialSource::File, stale))
+    Ok((content, CredentialSource::File))
 }
 
 #[cfg(target_os = "macos")]
@@ -188,6 +221,15 @@ mod tests {
     fn rejects_api_key_mode() {
         let error = parse_credentials(r#"{"auth_mode":"apikey"}"#).unwrap_err();
         assert_eq!(error.code(), "unsupported_auth_mode");
+    }
+
+    #[test]
+    fn classifies_account_modes_without_exposing_credentials() {
+        let auth: CodexAuthJson = serde_json::from_str(VALID).expect("valid fixture");
+        assert_eq!(auth.auth_mode.as_deref(), Some("chatgpt"));
+        let api: CodexAuthJson =
+            serde_json::from_str(r#"{"auth_mode":"apikey"}"#).expect("valid API fixture");
+        assert_eq!(api.auth_mode.as_deref(), Some("apikey"));
     }
 
     #[test]

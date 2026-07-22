@@ -22,6 +22,8 @@ macOS Keychain / ~/.codex/auth.json
            Local Snapshot Store
 ```
 
+任务状态中心从 `$CODEX_HOME/sessions`（默认 `~/.codex/sessions`）读取本机会话生命周期事件，标准化为运行中、完成和失败状态。前端只接收任务标题摘要、项目末级名称、状态和时间；原始会话内容不会复制到应用存储。扫描器每 2 秒增量刷新最近会话，并通过 Tauri 事件同步浮窗、菜单栏和完成通知。会话事件属于兼容层，未来可在稳定的 Codex Hooks/app-server 客户端可用时替换，UI 状态模型无需改变。
+
 应用采用 Tauri 2。Rust 负责凭据读取、网络请求、快照存储、调度和系统能力；React/TypeScript 负责菜单弹层、浮窗和设置界面。
 
 ## 2. 模块边界
@@ -74,6 +76,13 @@ interface UsageSnapshot {
   source: "codex_oauth";
   accountIdHash?: string;
   windows: UsageWindow[];
+  planType?: string;
+  credits?: {
+    hasCredits: boolean;
+    unlimited: boolean;
+    balance?: string;
+    expiresAt?: number;
+  };
   queriedAt: number;
 }
 
@@ -133,8 +142,8 @@ pub enum UsageError {
 ## 5. macOS 系统集成
 
 - Menu Bar：Tauri tray API 加原生扩展处理动态标题和模板图标
-- 玻璃材质：使用 NSVisualEffectView 或成熟的 Tauri macOS 插件
-- 浮窗：无边框、透明、可拖动、可置顶，支持隐藏 Dock 图标
+- 浮窗外观：标准面板、无边框、可拖动、可置顶，不提供通透强度调节
+- Dock：macOS 可在设置中切换 Dock 图标显示状态
 - 登录项：使用 macOS ServiceManagement 能力
 - 通知：使用系统 UserNotifications
 - 睡眠恢复：监听 workspace wake notification
@@ -158,10 +167,13 @@ pub enum UsageError {
 - Keychain 不可用时文件回退
 - `CODEX_HOME` 自定义路径
 - 文件更新期间的安全读取
+- JSONL 追加内容只从上次字节位置继续解析
+- 会话文件截断或替换后的解析状态重建
+- 标题变化不使任务事件缓存失效
 
 ### UI 测试
 
-- 浅色、深色、高对比度和减少透明度
+- 标准外观、高对比度和减少动态效果
 - 紧凑与详细模式
 - 长中文、英文和动态周期标签
 - 多显示器位置恢复
