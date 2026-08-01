@@ -43,6 +43,25 @@ pub struct RefreshSettings {
     pub notify_hundred: bool,
     #[serde(default)]
     pub notify_reset: bool,
+    #[serde(default)]
+    pub claude_enabled: bool,
+    #[serde(default)]
+    pub default_product: ProductSourceSetting,
+    #[serde(default = "default_true")]
+    pub notify_claude_waiting: bool,
+    #[serde(default = "default_true")]
+    pub notify_claude_completed: bool,
+    #[serde(default = "default_true")]
+    pub notify_claude_failed: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProductSourceSetting {
+    #[default]
+    Codex,
+    Claude,
+    Auto,
 }
 
 impl Default for RefreshSettings {
@@ -55,6 +74,11 @@ impl Default for RefreshSettings {
             notify_ninety: true,
             notify_hundred: true,
             notify_reset: false,
+            claude_enabled: false,
+            default_product: ProductSourceSetting::Codex,
+            notify_claude_waiting: true,
+            notify_claude_completed: true,
+            notify_claude_failed: true,
         }
     }
 }

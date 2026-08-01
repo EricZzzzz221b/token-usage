@@ -55,9 +55,17 @@ jobs:
       - run: npm test
       - run: cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --all-targets -- -D warnings
+      - name: Detect Windows installer eligibility
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $eligible = -not $version.Contains("-")
+          "WINDOWS_INSTALLER_ELIGIBLE=$($eligible.ToString().ToLower())" | Add-Content $env:GITHUB_ENV
       - name: Build MSI and NSIS installers
+        if: env.WINDOWS_INSTALLER_ELIGIBLE == 'true'
         run: npm run tauri -- build --target x86_64-pc-windows-msvc --bundles msi,nsis
       - name: Normalize release filenames and checksums
+        if: env.WINDOWS_INSTALLER_ELIGIBLE == 'true'
         shell: pwsh
         run: |
           $version = (Get-Content package.json | ConvertFrom-Json).version
@@ -74,6 +82,7 @@ jobs:
           "WINDOWS_EXE=$exe" | Add-Content $env:GITHUB_ENV
           "WINDOWS_CHECKSUMS=$checksums" | Add-Content $env:GITHUB_ENV
       - uses: actions/upload-artifact@v6
+        if: env.WINDOWS_INSTALLER_ELIGIBLE == 'true'
         with:
           name: TokenUsage-Windows-${{ env.RELEASE_VERSION }}-x64
           path: |

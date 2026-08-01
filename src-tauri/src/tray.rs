@@ -7,7 +7,7 @@ use tauri::{
 };
 
 use crate::refresh::{RefreshCoordinator, TrayWindow, UsageView};
-use crate::tasks::{is_active, TaskMonitor, TaskStatus};
+use crate::tasks::{is_active, ProductSource, TaskMonitor, TaskStatus};
 
 const TRAY_ID: &str = "token-usage";
 const SUMMARY_ID: &str = "usage-summary";
@@ -86,6 +86,10 @@ pub fn update(app: &AppHandle, view: &UsageView, tray_window: TrayWindow) {
         .filter(|task| is_active(&task.status))
         .collect::<Vec<_>>();
     if let Some(task) = active_tasks.first() {
+        let product = match task.product {
+            ProductSource::Codex => "Codex",
+            ProductSource::Claude => "Claude",
+        };
         let status = &task.status;
         let status_text = match status {
             TaskStatus::Thinking => "思考中",
@@ -103,7 +107,7 @@ pub fn update(app: &AppHandle, view: &UsageView, tray_window: TrayWindow) {
         };
         let elapsed = elapsed_label(task.started_at);
         title = format!("{status_text}{elapsed} · {title}");
-        tooltip = format!("Codex {status_text}{elapsed}{count} · {tooltip}");
+        tooltip = format!("{product} {status_text}{elapsed}{count} · {tooltip}");
     }
     let _ = tray.set_title(Some(title));
     let _ = tray.set_tooltip(Some(tooltip));

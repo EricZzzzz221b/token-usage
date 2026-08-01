@@ -1,12 +1,15 @@
 name: Release macOS
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag, for example v1.0.0
+        description: Release tag, for example v1.2.5-beta.1
         required: true
-        default: v1.0.0
+        default: v1.2.5-beta.1
 
 permissions:
   contents: write
@@ -14,6 +17,9 @@ permissions:
 jobs:
   release:
     runs-on: macos-14
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -21,16 +27,42 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
       - run: npm ci
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ inputs.tag }}
-          releaseName: Token用量 ${{ inputs.tag }}
-          releaseBody: macOS Apple Silicon release of Token用量.
-          releaseDraft: false
-          prerelease: false
+      - run: npm run check
+      - name: Verify tag matches app version
+        run: |
+          VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          test "$RELEASE_TAG" = "v$VERSION"
+      - name: Build signed app and DMG
+        run: |
+          npm run tauri -- build --bundles app
+          ./scripts/build-dmg.sh
+      - name: Generate checksum
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          cd outputs
+          shasum -a 256 "TokenUsage_${VERSION}_arm64.dmg" > "SHA256SUMS-${VERSION}.txt"
+      - name: Create or update GitHub release
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          DMG="outputs/TokenUsage_${VERSION}_arm64.dmg"
+          CHECKSUM="outputs/SHA256SUMS-${VERSION}.txt"
+          NOTES="docs/release-notes-${RELEASE_TAG}.md"
+          if [ ! -f "$NOTES" ]; then
+            NOTES="outputs/TokenUsage_${VERSION}_ReleaseNotes.md"
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$DMG" "$CHECKSUM" --clobber
+            gh release edit "$RELEASE_TAG" --title "Token用量 $RELEASE_TAG" --notes-file "$NOTES"
+          elif [[ "$RELEASE_TAG" == *-* ]]; then
+            gh release create "$RELEASE_TAG" "$DMG" "$CHECKSUM" \
+              --title "Token用量 $RELEASE_TAG" --notes-file "$NOTES" --prerelease
+          else
+            gh release create "$RELEASE_TAG" "$DMG" "$CHECKSUM" \
+              --title "Token用量 $RELEASE_TAG" --notes-file "$NOTES"
+          fi

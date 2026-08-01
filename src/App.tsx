@@ -17,14 +17,17 @@ import {
   ensureNotificationPermission,
   getAccountMode,
   getAutostart,
+  getClaudeEnvironment,
   setAutostart,
   type AccountMode,
+  type ClaudeEnvironment,
 } from "./system";
 import {
   getTasks,
-  openCodexThread,
+  openTask,
   onTasksUpdated,
   type CodexTask,
+  type ProductSource,
   type TaskSnapshot,
   type TaskStatus,
 } from "./tasks";
@@ -57,6 +60,11 @@ const defaultRefreshSettings: RefreshSettings = {
   notifyNinety: true,
   notifyHundred: true,
   notifyReset: false,
+  claudeEnabled: false,
+  defaultProduct: "codex",
+  notifyClaudeWaiting: true,
+  notifyClaudeCompleted: true,
+  notifyClaudeFailed: true,
 };
 
 const emptyTaskSnapshot = (): TaskSnapshot => ({ tasks: [], queriedAt: Date.now() });
@@ -112,7 +120,8 @@ interface AppProps {
   loadTasks?: () => Promise<TaskSnapshot>;
   subscribeTasks?: (handler: (snapshot: TaskSnapshot) => void) => Promise<() => void>;
   loadAccountMode?: () => Promise<{ mode: AccountMode }>;
-  openTask?: (sessionId: string) => Promise<void>;
+  loadClaudeEnvironment?: () => Promise<ClaudeEnvironment>;
+  openTask?: (product: ProductSource, sessionId: string) => Promise<void>;
 }
 
 function remainingPercent(usedPercent: number) {
@@ -169,7 +178,8 @@ export default function App({
   loadTasks = loadTasksSafely,
   subscribeTasks = subscribeTasksSafely,
   loadAccountMode = loadAccountModeSafely,
-  openTask = openCodexThread,
+  loadClaudeEnvironment = getClaudeEnvironment,
+  openTask: openTaskSession = openTask,
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
@@ -190,6 +200,8 @@ export default function App({
   const [tasks, setTasks] = useState<TaskSnapshot>({ tasks: [], queriedAt: Date.now() });
   const [clock, setClock] = useState(Date.now());
   const [accountMode, setAccountMode] = useState<AccountMode>("signed_out");
+  const [claudeEnvironment, setClaudeEnvironment] = useState<ClaudeEnvironment>();
+  const [selectedProduct, setSelectedProduct] = useState<ProductSource>("codex");
   // Keep this above the detailed/compact branches so changing views does not
   // recreate the disclosure and discard the user's choice.
   const [resetsExpanded, setResetsExpanded] = useState(false);
@@ -236,10 +248,14 @@ export default function App({
       settingsRef.current = next;
       persistedSettingsRef.current = next;
       setSettings(next);
+      setSelectedProduct(next.defaultProduct === "claude" ? "claude" : "codex");
     });
     void loadAutostart().then(setAutostartValue);
     void loadAppVersion().then(setAppVersion);
     void loadAccountMode().then((report) => setAccountMode(report.mode));
+    void loadClaudeEnvironment()
+      .then(setClaudeEnvironment)
+      .catch(() => undefined);
     void loadWindowPreferences().then((next) => {
       preferencesRef.current = next;
       persistedPreferencesRef.current = next;
@@ -296,6 +312,7 @@ export default function App({
     loadWindowPreferences,
     loadTasks,
     loadAccountMode,
+    loadClaudeEnvironment,
     subscribe,
     subscribeSettings,
     subscribeWindowPreferences,
@@ -394,13 +411,15 @@ export default function App({
   const textToneClass = `backdrop-${backdropTone}`;
   const platformClass = navigator.userAgent.includes("Windows") ? "platform-windows" : "";
   const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
-  const activeTasks = tasks.tasks.filter((task) => isTaskActive(task.status));
+  const selectedTasks = tasks.tasks.filter((task) => (task.product ?? "codex") === selectedProduct);
+  const activeTasks = selectedTasks.filter((task) => isTaskActive(task.status));
   const primaryTask = activeTasks[0];
-  const recentCompletion = tasks.tasks.find(
+  const recentCompletion = selectedTasks.find(
     (task) => task.status === "completed" && clock - (task.completedAt ?? task.updatedAt) < 15_000,
   );
   const displayTask = primaryTask ?? recentCompletion;
   const displayStatus: TaskStatus = displayTask?.status ?? "unknown";
+  const effectiveProduct = selectedProduct;
 
   const openSettings = () => {
     setScreen("settings");
@@ -429,7 +448,9 @@ export default function App({
           onMouseDown={drag}
         >
           <div className="compact-primary" role="status" aria-live="polite">
-            <span className="status-signal" aria-hidden="true" />
+            <span className="product-mark" aria-hidden="true">
+              {(displayTask?.product ?? selectedProduct) === "claude" ? "C" : "⌘"}
+            </span>
             <div className="compact-status-copy">
               <strong>{t(`taskStatus.${displayStatus}`)}</strong>
               <span>
@@ -442,7 +463,9 @@ export default function App({
           {activeTasks.length > 1 && (
             <span className="compact-task-count">+{activeTasks.length - 1}</span>
           )}
-          {!settings.usageEnabled ? (
+          {effectiveProduct === "claude" ? (
+            <span className="compact-quota">{t("claudeUsageUnavailableShort")}</span>
+          ) : !settings.usageEnabled ? (
             <button
               className="compact-quota-button"
               type="button"
@@ -489,8 +512,14 @@ export default function App({
       <section className="liquid-panel">
         <header className="titlebar" onMouseDown={drag}>
           <div className="title-identity">
-            <h1>{screen === "settings" ? t("settingsTitle") : t("meterTitle")}</h1>
-            {screen !== "settings" && (
+            <h1>
+              {screen === "settings"
+                ? t("settingsTitle")
+                : effectiveProduct === "claude"
+                  ? t("claudeMonitorTitle")
+                  : t("meterTitle")}
+            </h1>
+            {screen !== "settings" && effectiveProduct === "codex" && (
               <span className={`account-mode mode-${accountMode}`}>
                 {accountMode === "subscription" && view.status === "ready" && view.snapshot.planType
                   ? t("subscriptionMode", { plan: view.snapshot.planType.toUpperCase() })
@@ -559,6 +588,55 @@ export default function App({
                 onChange={(checked) => void updatePreferences({ clickThrough: checked })}
               />
             </SettingsGroup>
+            <SettingsGroup title={t("aiProductsGroup")}>
+              <ToggleRow
+                label={t("enableClaude")}
+                checked={settings.claudeEnabled}
+                onChange={(checked) => void updateSettings({ claudeEnabled: checked })}
+              />
+              <SelectRow
+                label={t("defaultProduct")}
+                value={settings.defaultProduct}
+                onChange={(value) => {
+                  const product = value as ProductSource;
+                  setSelectedProduct(product);
+                  void updateSettings({ defaultProduct: product });
+                }}
+                options={[
+                  ["codex", "Codex"],
+                  ["claude", "Claude"],
+                ]}
+              />
+              <div className="setting-row claude-environment-row">
+                <span>{t("claudeEnvironment")}</span>
+                <span className="row-value">
+                  {claudeEnvironment?.desktopInstalled
+                    ? claudeEnvironment.codeAvailable
+                      ? t("claudeEnvironmentReady")
+                      : t("claudeDesktopOnly")
+                    : t("claudeNotInstalled")}
+                </span>
+              </div>
+            </SettingsGroup>
+            {settings.claudeEnabled && (
+              <SettingsGroup title={t("claudeNotificationsGroup")}>
+                <ToggleRow
+                  label={t("notifyClaudeWaiting")}
+                  checked={settings.notifyClaudeWaiting}
+                  onChange={(checked) => void updateSettings({ notifyClaudeWaiting: checked })}
+                />
+                <ToggleRow
+                  label={t("notifyClaudeCompleted")}
+                  checked={settings.notifyClaudeCompleted}
+                  onChange={(checked) => void updateSettings({ notifyClaudeCompleted: checked })}
+                />
+                <ToggleRow
+                  label={t("notifyClaudeFailed")}
+                  checked={settings.notifyClaudeFailed}
+                  onChange={(checked) => void updateSettings({ notifyClaudeFailed: checked })}
+                />
+              </SettingsGroup>
+            )}
             <SettingsGroup title={t("dataGroup")}>
               <SelectRow
                 label={t("trayWindow")}
@@ -657,7 +735,10 @@ export default function App({
             onAuthorize={authorize}
             t={t}
             accountMode={accountMode}
-            onOpenTask={openTask}
+            onOpenTask={openTaskSession}
+            selectedProduct={selectedProduct}
+            onSelectedProductChange={setSelectedProduct}
+            claudeEnabled={settings.claudeEnabled}
             resetsExpanded={resetsExpanded}
             onResetsExpandedChange={setResetsExpanded}
           />
@@ -681,6 +762,9 @@ function DashboardContent({
   resetsExpanded,
   onResetsExpandedChange,
   onOpenTask,
+  selectedProduct,
+  onSelectedProductChange,
+  claudeEnabled,
 }: {
   view: UsageView;
   usageEnabled: boolean;
@@ -694,24 +778,39 @@ function DashboardContent({
   accountMode: AccountMode;
   resetsExpanded: boolean;
   onResetsExpandedChange: (expanded: boolean) => void;
-  onOpenTask: (sessionId: string) => Promise<void>;
+  onOpenTask: (product: ProductSource, sessionId: string) => Promise<void>;
+  selectedProduct: ProductSource;
+  onSelectedProductChange: (product: ProductSource) => void;
+  claudeEnabled: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<"usage" | "tasks">("usage");
-  const active = tasks.tasks.filter((task) => isTaskActive(task.status));
-  const primary = active[0];
-  const justCompleted = tasks.tasks.find(
+  const selectedTasks = tasks.tasks.filter((task) => (task.product ?? "codex") === selectedProduct);
+  const visibleActive = selectedTasks.filter((task) => isTaskActive(task.status));
+  const selectedJustCompleted = selectedTasks.find(
     (task) => task.status === "completed" && now - (task.completedAt ?? task.updatedAt) < 15_000,
   );
-  const featuredTask = primary ?? justCompleted;
-  const recent = tasks.tasks
+  const visibleRecent = selectedTasks
     .filter((task) => task.status === "completed")
     .sort(
       (left, right) =>
         (right.completedAt ?? right.updatedAt) - (left.completedAt ?? left.updatedAt),
     )
     .slice(0, 5);
+  const effectiveProduct = selectedProduct;
   return (
     <div className="dashboard-content">
+      <nav className="product-switcher" aria-label={t("productSource")}>
+        {(["codex", "claude"] as const).map((product) => (
+          <button
+            className={selectedProduct === product ? "active" : ""}
+            type="button"
+            key={product}
+            onClick={() => onSelectedProductChange(product)}
+          >
+            {product === "codex" ? "Codex" : "Claude"}
+          </button>
+        ))}
+      </nav>
       <nav className="meter-tabs" aria-label={t("overviewTabs")}>
         <button
           className={activeTab === "usage" ? "active" : ""}
@@ -727,30 +826,34 @@ function DashboardContent({
           aria-selected={activeTab === "tasks"}
           onClick={() => setActiveTab("tasks")}
         >
-          {active.length > 0 && <span className="live-dot" aria-hidden="true" />}
+          {visibleActive.length > 0 && <span className="live-dot" aria-hidden="true" />}
           {t("tasksTab")}
-          {active.length > 0 && <span className="task-count">{active.length}</span>}
+          {visibleActive.length > 0 && <span className="task-count">{visibleActive.length}</span>}
         </button>
       </nav>
       {activeTab === "usage" ? (
-        <MeterContent
-          view={view}
-          usageEnabled={usageEnabled}
-          stale={view.status === "ready" && view.stale}
-          intervalMinutes={intervalMinutes}
-          locale={locale}
-          onRefresh={onRefresh}
-          onAuthorize={onAuthorize}
-          t={t}
-          accountMode={accountMode}
-          resetsExpanded={resetsExpanded}
-          onResetsExpandedChange={onResetsExpandedChange}
-        />
+        effectiveProduct === "claude" ? (
+          <ClaudeUsageUnavailable t={t} claudeEnabled={claudeEnabled} />
+        ) : (
+          <MeterContent
+            view={view}
+            usageEnabled={usageEnabled}
+            stale={view.status === "ready" && view.stale}
+            intervalMinutes={intervalMinutes}
+            locale={locale}
+            onRefresh={onRefresh}
+            onAuthorize={onAuthorize}
+            t={t}
+            accountMode={accountMode}
+            resetsExpanded={resetsExpanded}
+            onResetsExpandedChange={onResetsExpandedChange}
+          />
+        )
       ) : (
         <TaskTabContent
-          activeTasks={active}
-          fallbackTask={featuredTask}
-          recent={recent}
+          activeTasks={visibleActive}
+          fallbackTask={selectedJustCompleted}
+          recent={visibleRecent}
           now={now}
           locale={locale}
           t={t}
@@ -776,7 +879,7 @@ function TaskTabContent({
   now: number;
   locale: string;
   t: ReturnType<typeof useTranslation>["t"];
-  onOpenTask: (sessionId: string) => Promise<void>;
+  onOpenTask: (product: ProductSource, sessionId: string) => Promise<void>;
 }) {
   return (
     <div className="task-tab-content">
@@ -786,7 +889,7 @@ function TaskTabContent({
             <StatusHero key={task.id} task={task} now={now} t={t} onOpenTask={onOpenTask} />
           ))
         ) : (
-          <StatusHero task={fallbackTask} now={now} t={t} />
+          <StatusHero task={fallbackTask} now={now} t={t} onOpenTask={onOpenTask} />
         )}
       </div>
       {recent.length > 0 && (
@@ -800,8 +903,16 @@ function TaskTabContent({
               disabled={!item.sessionId}
               aria-label={`${item.title} · ${t("openTask")}`}
               title={t("openTask")}
-              onClick={() => item.sessionId && void onOpenTask(item.sessionId)}
+              onClick={() =>
+                item.sessionId && void onOpenTask(item.product ?? "codex", item.sessionId)
+              }
             >
+              <span
+                className={`task-product product-${item.product ?? "codex"}`}
+                aria-hidden="true"
+              >
+                {item.product === "claude" ? "C" : "⌘"}
+              </span>
               <span className="recent-state">{t(`taskStatus.${item.status}`)}</span>
               <strong>{item.title}</strong>
               <time>
@@ -826,12 +937,14 @@ function StatusHero({
   task?: CodexTask;
   now: number;
   t: ReturnType<typeof useTranslation>["t"];
-  onOpenTask?: (sessionId: string) => Promise<void>;
+  onOpenTask?: (product: ProductSource, sessionId: string) => Promise<void>;
 }) {
   const status = task?.status ?? "unknown";
   const content = (
     <>
-      <span className="status-signal" aria-hidden="true" />
+      <span className={`task-product product-${task?.product ?? "codex"}`} aria-hidden="true">
+        {task?.product === "claude" ? "C" : "⌘"}
+      </span>
       <div className="status-hero-copy">
         <div className="status-line">
           <strong>{t(`taskStatus.${status}`)}</strong>
@@ -849,7 +962,7 @@ function StatusHero({
         type="button"
         aria-label={`${task.title} · ${t("openTask")}`}
         title={t("openTask")}
-        onClick={() => void onOpenTask(task.sessionId!)}
+        onClick={() => void onOpenTask(task.product ?? "codex", task.sessionId!)}
       >
         {content}
       </button>
@@ -859,6 +972,31 @@ function StatusHero({
     <section className={`status-hero status-${status}`} aria-live="polite">
       {content}
     </section>
+  );
+}
+
+function ClaudeUsageUnavailable({
+  t,
+  claudeEnabled,
+}: {
+  t: ReturnType<typeof useTranslation>["t"];
+  claudeEnabled: boolean;
+}) {
+  return (
+    <div className="state-card claude-usage-state">
+      <div className="claude-state-heading">
+        <span className="task-product product-claude" aria-hidden="true">
+          C
+        </span>
+        <div>
+          <strong>{t("claudeSharedUsage")}</strong>
+          <small>{t("claudeSharedUsageScope")}</small>
+        </div>
+        <span className="beta-badge">BETA</span>
+      </div>
+      <p>{claudeEnabled ? t("claudeUsageUnavailable") : t("claudeEnableHint")}</p>
+      <span className="data-confidence">{t("noEstimatedPercentage")}</span>
+    </div>
   );
 }
 

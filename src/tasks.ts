@@ -4,7 +4,10 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 export type TaskStatus =
   "thinking" | "executing" | "waiting" | "completed" | "failed" | "interrupted" | "unknown";
 
+export type ProductSource = "codex" | "claude";
+
 export interface CodexTask {
+  product: ProductSource;
   id: string;
   sessionId?: string;
   title: string;
@@ -28,6 +31,6 @@ export function onTasksUpdated(handler: (snapshot: TaskSnapshot) => void): Promi
   return listen<TaskSnapshot>("tasks://updated", (event) => handler(event.payload));
 }
 
-export function openCodexThread(sessionId: string): Promise<void> {
-  return invoke<void>("open_codex_thread", { sessionId });
+export function openTask(product: ProductSource, sessionId: string): Promise<void> {
+  return invoke<void>("open_task", { product, sessionId });
 }
