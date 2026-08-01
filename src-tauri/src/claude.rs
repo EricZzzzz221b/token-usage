@@ -1,4 +1,7 @@
-use std::{fs, path::PathBuf};
+use std::path::PathBuf;
+
+#[cfg(target_os = "macos")]
+use std::fs;
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::process::Stdio;
