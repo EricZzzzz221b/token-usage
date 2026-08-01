@@ -15,6 +15,14 @@ export const getDiagnosticReport = () => invoke<DiagnosticReport>("diagnostic_re
 export const enableUsage = () => invoke<import("./usage").UsageView>("enable_usage");
 export type AccountMode = "subscription" | "api" | "other" | "signed_out";
 export const getAccountMode = () => invoke<{ mode: AccountMode }>("account_mode");
+export interface ClaudeEnvironment {
+  desktopInstalled: boolean;
+  desktopRunning: boolean;
+  codeAvailable: boolean;
+  taskSource: "local_claude_code_sessions";
+  usageStatus: "unavailable";
+}
+export const getClaudeEnvironment = () => invoke<ClaudeEnvironment>("claude_environment");
 
 export async function ensureNotificationPermission(): Promise<boolean> {
   if (await isPermissionGranted()) return true;

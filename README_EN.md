@@ -4,13 +4,13 @@
 
 <h1 align="center">Token Usage</h1>
 
-<p align="center"><strong>Know how much quota is left and whether Codex is done—without switching back.</strong></p>
+<p align="center"><strong>Know how much quota is left and whether Codex or Claude is done—without switching back.</strong></p>
 
-<p align="center">A Codex usage and task monitor for the Windows system tray and macOS menu bar.</p>
+<p align="center">A local AI usage and task monitor for the Windows system tray and macOS menu bar.</p>
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.1"><img src="https://img.shields.io/badge/macOS-v1.2.1-111111?logo=apple" alt="macOS v1.2.1"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.1"><img src="https://img.shields.io/badge/macOS-v1.2.5--beta.1-111111?logo=apple" alt="macOS v1.2.5-beta.1"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
 </p>
 
@@ -21,6 +21,8 @@
 </p>
 
 Token Usage puts the two Codex details you check most often into one small widget: **how much quota remains, and whether your current tasks are still running**. Keep working in your browser, editor, or design tool while the menu bar shows whether Codex is thinking, executing a tool, or waiting for input. When a task finishes, the app can notify you and open the matching Codex conversation from the recent list.
+
+macOS v1.2.5-beta.1 adds experimental Claude support. You can switch between Codex and Claude and opt in to read-only monitoring of local Claude Code session events. Anthropic does not currently expose a safe third-party API for personal subscription quota, so the Claude view reports usage as unavailable instead of presenting an estimated percentage.
 
 The app detects whether the official account is using a subscription or API mode. Subscription accounts show plan information and usage windows; API mode shows Credits when the official response provides them. Credentials, usage data, and task detection stay on your Mac or PC.
 
@@ -59,6 +61,7 @@ The app detects whether the official account is using a subscription or API mode
 - Detailed and compact widgets with quick switching from the widget or tray
 - Manual refresh, configurable refresh interval, and quota alerts
 - Live local Codex task detection, elapsed time, five recent completions, and completion notifications
+- Experimental macOS Claude Code task monitoring with explicit Codex / Claude source switching
 - One-click navigation from active and recently completed tasks to their Codex conversations
 - Multiple active tasks displayed separately
 - Always on top, position lock, click-through, and launch at login
@@ -88,12 +91,12 @@ The app detects whether the official account is using a subscription or API mode
 
 | Platform                         | Status    | Version and download                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS 13+ Apple Silicon          | Available | [v1.2.1](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.1) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/TokenUsage_1.2.1_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/SHA256SUMS-1.2.1.txt)                                                                                                                                                                     |
+| macOS 13+ Apple Silicon          | Beta      | [v1.2.5-beta.1](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.1) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/TokenUsage_1.2.5-beta.1_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/SHA256SUMS-1.2.5-beta.1.txt)                                                                                                                           |
 | Windows 11 / Windows 10 22H2 x64 | Available | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
 
-### macOS v1.2.1
+### macOS v1.2.5-beta.1
 
-Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/TokenUsage_1.2.1_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. v1.2.1 adds active-task conversation shortcuts and fixes transient recent-completion loss, reset-opportunity gaps, and disclosure-chevron movement. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
+Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/TokenUsage_1.2.5-beta.1_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. Claude integration is disabled by default and can be enabled in Settings. It only reads local JSONL events already created under `~/.claude/projects`. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
 ### Windows v1.1.5
 
@@ -103,6 +106,7 @@ The Windows release supports x64 only. Prefer the MSI, or use the NSIS setup EXE
 
 - OAuth credentials are read into local memory only and used solely for the official Codex usage endpoint.
 - Task status incrementally reads local Codex lifecycle events; full prompts, responses, command output, and file contents are not uploaded or copied into app storage.
+- Claude integration is disabled by default; when enabled, it reads local Claude Code events without accessing Claude Desktop cookies, IndexedDB, or internal databases.
 - The app does not store, log, or upload access tokens, refresh tokens, email addresses, account IDs, or raw authentication data.
 - Windows reads `%USERPROFILE%\.codex\auth.json` or `CODEX_HOME\auth.json`; it does not guess or read unverified Credential Manager formats.
 - Settings and cache use Tauri system directories, including AppData on Windows.

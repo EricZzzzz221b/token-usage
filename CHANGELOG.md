@@ -1,5 +1,14 @@
 # 更新记录
 
+## v1.2.5-beta.1 · 2026-08-01
+
+- 新增 Codex / Claude 来源切换，Claude 集成默认关闭并可独立启用。
+- 只读增量扫描本机 Claude Code 会话，显示任务来源、状态、项目与完成时间。
+- 新增 Claude Desktop / Claude Code 环境检测，以及等待操作、完成和失败通知开关。
+- Claude 任务可打开 Claude Desktop；任务列表和紧凑模式严格按当前来源显示。
+- Anthropic 未提供可安全读取的个人订阅剩余额度 API 时，明确显示不可用状态，不展示估算百分比。
+- 不读取 Claude Desktop Cookie、IndexedDB、内部数据库、完整提示词、回复或工具参数。
+
 ## v1.2.1 · 2026-07-22
 
 - 进行中的任务现在也可点击，并能直接打开对应的 Codex 会话。

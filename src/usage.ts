@@ -46,6 +46,11 @@ export interface RefreshSettings {
   notifyNinety: boolean;
   notifyHundred: boolean;
   notifyReset: boolean;
+  claudeEnabled: boolean;
+  defaultProduct: "codex" | "claude";
+  notifyClaudeWaiting: boolean;
+  notifyClaudeCompleted: boolean;
+  notifyClaudeFailed: boolean;
 }
 
 export function getUsage(): Promise<UsageView> {

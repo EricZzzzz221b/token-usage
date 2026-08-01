@@ -1,3 +1,4 @@
+mod claude;
 mod credentials;
 mod error;
 mod model;
@@ -19,7 +20,12 @@ fn get_tasks(monitor: State<'_, tasks::TaskMonitor>) -> tasks::TaskSnapshot {
 }
 
 #[tauri::command]
-fn open_codex_thread(session_id: String) -> Result<(), UsageErrorPayload> {
+fn claude_environment() -> claude::ClaudeEnvironmentReport {
+    claude::inspect_environment()
+}
+
+#[tauri::command]
+fn open_task(product: tasks::ProductSource, session_id: String) -> Result<(), UsageErrorPayload> {
     if session_id.is_empty()
         || session_id.len() > 64
         || !session_id
@@ -28,7 +34,10 @@ fn open_codex_thread(session_id: String) -> Result<(), UsageErrorPayload> {
     {
         return Err(UsageErrorPayload::from(error::UsageError::InvalidSettings));
     }
-    let url = format!("codex://threads/{session_id}");
+    let url = match product {
+        tasks::ProductSource::Codex => format!("codex://threads/{session_id}"),
+        tasks::ProductSource::Claude => "claude://claude.ai/code".into(),
+    };
     #[cfg(target_os = "macos")]
     let result = std::process::Command::new("open").arg(&url).spawn();
     #[cfg(target_os = "windows")]
@@ -270,8 +279,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             credential_status,
             account_mode,
+            claude_environment,
             get_tasks,
-            open_codex_thread,
+            open_task,
             get_usage,
             refresh_usage,
             get_refresh_settings,

@@ -8,12 +8,12 @@ use std::{
 };
 
 use rusqlite::{Connection, OpenFlags};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_notification::NotificationExt;
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaskStatus {
     Thinking,
@@ -22,7 +22,15 @@ pub enum TaskStatus {
     Completed,
     Failed,
     Interrupted,
+    #[default]
     Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProductSource {
+    Codex,
+    Claude,
 }
 
 const ACTIVE_STALE_AFTER_MILLIS: i64 = 12 * 60 * 60 * 1_000;
@@ -31,6 +39,7 @@ const WAITING_STALE_AFTER_MILLIS: i64 = 72 * 60 * 60 * 1_000;
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodexTask {
+    pub product: ProductSource,
     pub id: String,
     pub session_id: String,
     pub title: String,
@@ -112,8 +121,29 @@ struct SessionScanner {
     sidebar_titles: TitleCache,
     database_titles: TitleCache,
     last_database_refresh: Option<Instant>,
+    claude_rollouts: HashMap<PathBuf, CachedClaudeRollout>,
     #[cfg(test)]
     parse_count: usize,
+}
+
+#[derive(Clone)]
+struct CachedClaudeRollout {
+    fingerprint: FileFingerprint,
+    parser: ClaudeRolloutParser,
+}
+
+#[derive(Clone, Default)]
+struct ClaudeRolloutParser {
+    offset: u64,
+    session_id: String,
+    title: String,
+    project: String,
+    started_at: i64,
+    updated_at: i64,
+    completed_at: Option<i64>,
+    status: TaskStatus,
+    saw_assistant: bool,
+    is_sidechain: bool,
 }
 
 #[derive(Clone)]
@@ -142,14 +172,16 @@ impl TaskMonitor {
     pub fn start(&self, app: AppHandle) {
         let monitor = self.clone();
         tauri::async_runtime::spawn(async move {
-            let mut previous = monitor.scan();
+            let coordinator = app.state::<crate::refresh::RefreshCoordinator>();
+            let mut previous = monitor.scan(coordinator.settings().await.claude_enabled);
             monitor.store_snapshot(previous.clone());
             let _ = app.emit("tasks://updated", &previous);
             let mut last_tray_refresh = Instant::now();
             loop {
                 tokio::time::sleep(Duration::from_secs(2)).await;
-                let current = monitor.scan();
-                notify_completions(&app, &previous, &current);
+                let current = monitor.scan(coordinator.settings().await.claude_enabled);
+                let settings = coordinator.settings().await;
+                notify_completions(&app, &previous, &current, &settings);
                 let tasks_changed = current.tasks != previous.tasks;
                 monitor.store_snapshot(current.clone());
                 if tasks_changed {
@@ -166,10 +198,10 @@ impl TaskMonitor {
         });
     }
 
-    fn scan(&self) -> TaskSnapshot {
+    fn scan(&self, include_claude: bool) -> TaskSnapshot {
         self.scanner
             .lock()
-            .map(|mut scanner| scanner.scan(&codex_home()))
+            .map(|mut scanner| scanner.scan(&codex_home(), include_claude))
             .unwrap_or_else(|_| self.snapshot())
     }
 
@@ -188,7 +220,7 @@ fn codex_home() -> PathBuf {
 }
 
 impl SessionScanner {
-    fn scan(&mut self, home: &Path) -> TaskSnapshot {
+    fn scan(&mut self, home: &Path, include_claude: bool) -> TaskSnapshot {
         refresh_title_cache(
             &mut self.sidebar_titles,
             &home.join("session_index.jsonl"),
@@ -264,12 +296,79 @@ impl SessionScanner {
                     .map(refresh_stale_status)
             })
             .collect::<Vec<_>>();
-        tasks.sort_by_key(|task| std::cmp::Reverse(task.updated_at));
         tasks.truncate(20);
+        if include_claude {
+            let mut claude_tasks = self.scan_claude(&claude_home());
+            claude_tasks.sort_by_key(|task| std::cmp::Reverse(task.updated_at));
+            claude_tasks.truncate(20);
+            tasks.extend(claude_tasks);
+        } else {
+            self.claude_rollouts.clear();
+        }
+        tasks.sort_by_key(|task| std::cmp::Reverse(task.updated_at));
         TaskSnapshot {
             tasks,
             queried_at: now_millis(),
         }
+    }
+}
+
+fn claude_home() -> PathBuf {
+    std::env::var_os("CLAUDE_CONFIG_DIR")
+        .map(PathBuf::from)
+        .or_else(|| dirs::home_dir().map(|path| path.join(".claude")))
+        .unwrap_or_else(|| PathBuf::from(".claude"))
+}
+
+impl SessionScanner {
+    fn scan_claude(&mut self, home: &Path) -> Vec<CodexTask> {
+        let mut files = Vec::new();
+        collect_jsonl(&home.join("projects"), 0, &mut files);
+        let mut files = files
+            .into_iter()
+            .filter_map(|path| {
+                let metadata = fs::metadata(&path).ok()?;
+                Some((path, FileFingerprint::from_metadata(&metadata)))
+            })
+            .collect::<Vec<_>>();
+        files.sort_by_key(|(_, fingerprint)| fingerprint.modified);
+        files.reverse();
+        files.truncate(40);
+
+        let retained = files
+            .iter()
+            .map(|(path, _)| path.clone())
+            .collect::<std::collections::HashSet<_>>();
+        self.claude_rollouts
+            .retain(|path, _| retained.contains(path));
+
+        files
+            .into_iter()
+            .filter_map(|(path, fingerprint)| {
+                let needs_parse = self
+                    .claude_rollouts
+                    .get(&path)
+                    .is_none_or(|cached| cached.fingerprint != fingerprint);
+                if needs_parse {
+                    let parser = self
+                        .claude_rollouts
+                        .remove(&path)
+                        .map(|cached| cached.parser);
+                    let parser = update_claude_parser(&path, parser, fingerprint.len)?;
+                    self.claude_rollouts.insert(
+                        path.clone(),
+                        CachedClaudeRollout {
+                            fingerprint,
+                            parser,
+                        },
+                    );
+                }
+                self.claude_rollouts
+                    .get(&path)
+                    .and_then(|cached| claude_task_from_parser(&path, &cached.parser))
+                    .map(refresh_stale_status)
+            })
+            .collect()
     }
 }
 
@@ -456,6 +555,156 @@ fn update_rollout_parser(
     Some(parser)
 }
 
+fn update_claude_parser(
+    path: &Path,
+    previous: Option<ClaudeRolloutParser>,
+    file_len: u64,
+) -> Option<ClaudeRolloutParser> {
+    let mut parser = previous.unwrap_or_default();
+    if file_len < parser.offset {
+        parser = ClaudeRolloutParser::default();
+    }
+    let mut file = fs::File::open(path).ok()?;
+    file.seek(SeekFrom::Start(parser.offset)).ok()?;
+    let mut reader = BufReader::new(file);
+    loop {
+        let line_start = reader.stream_position().ok()?;
+        let mut line = String::new();
+        let read = reader.read_line(&mut line).ok()?;
+        if read == 0 {
+            break;
+        }
+        if !line.ends_with('\n') {
+            parser.offset = line_start;
+            break;
+        }
+        parser.offset = reader.stream_position().ok()?;
+        let Ok(value) = serde_json::from_str::<Value>(line.trim_end()) else {
+            continue;
+        };
+        parser.process(&value);
+    }
+    Some(parser)
+}
+
+impl ClaudeRolloutParser {
+    fn process(&mut self, value: &Value) {
+        let timestamp = value
+            .get("timestamp")
+            .and_then(Value::as_str)
+            .and_then(parse_timestamp)
+            .unwrap_or_default();
+        self.updated_at = self.updated_at.max(timestamp);
+        if let Some(session_id) = value.get("sessionId").and_then(Value::as_str) {
+            self.session_id = session_id.to_owned();
+        }
+        if let Some(cwd) = value.get("cwd").and_then(Value::as_str) {
+            self.project = Path::new(cwd)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("Claude")
+                .to_owned();
+        }
+        self.is_sidechain |= value
+            .get("isSidechain")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+
+        match value.get("type").and_then(Value::as_str) {
+            Some("custom-title") => {
+                if let Some(title) = value.get("customTitle").and_then(Value::as_str) {
+                    self.title = compact_title(title);
+                }
+            }
+            Some("assistant") => {
+                self.saw_assistant = true;
+                if self.started_at == 0 {
+                    self.started_at = timestamp;
+                }
+                let stop_reason = value
+                    .pointer("/message/stop_reason")
+                    .and_then(Value::as_str);
+                let content = value.pointer("/message/content").and_then(Value::as_array);
+                let has_tool = content.is_some_and(|items| {
+                    items
+                        .iter()
+                        .any(|item| item.get("type").and_then(Value::as_str) == Some("tool_use"))
+                });
+                let waits_for_user = content.is_some_and(|items| {
+                    items.iter().any(|item| {
+                        item.get("type").and_then(Value::as_str) == Some("tool_use")
+                            && matches!(
+                                item.get("name").and_then(Value::as_str),
+                                Some("AskUserQuestion") | Some("ExitPlanMode")
+                            )
+                    })
+                });
+                if waits_for_user {
+                    self.status = TaskStatus::Waiting;
+                } else if has_tool || stop_reason == Some("tool_use") {
+                    self.status = TaskStatus::Executing;
+                } else if stop_reason == Some("end_turn") {
+                    self.status = TaskStatus::Completed;
+                    self.completed_at = Some(timestamp);
+                } else {
+                    self.status = TaskStatus::Thinking;
+                }
+            }
+            Some("user") => {
+                let has_tool_result = value
+                    .pointer("/message/content")
+                    .and_then(Value::as_array)
+                    .is_some_and(|items| {
+                        items.iter().any(|item| {
+                            item.get("type").and_then(Value::as_str) == Some("tool_result")
+                        })
+                    });
+                if has_tool_result && self.completed_at.is_none() {
+                    self.status = TaskStatus::Thinking;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn claude_task_from_parser(path: &Path, parser: &ClaudeRolloutParser) -> Option<CodexTask> {
+    if !parser.saw_assistant || parser.started_at == 0 || parser.is_sidechain {
+        return None;
+    }
+    let fallback_id = path.file_stem()?.to_string_lossy().into_owned();
+    Some(CodexTask {
+        product: ProductSource::Claude,
+        id: format!("claude:{fallback_id}"),
+        session_id: if parser.session_id.is_empty() {
+            fallback_id
+        } else {
+            parser.session_id.clone()
+        },
+        title: if parser.title.is_empty() {
+            "Claude 任务".into()
+        } else {
+            parser.title.clone()
+        },
+        project: if parser.project.is_empty() {
+            "Claude".into()
+        } else {
+            parser.project.clone()
+        },
+        status: parser.status.clone(),
+        started_at: parser.started_at,
+        updated_at: parser.updated_at,
+        completed_at: parser.completed_at,
+    })
+}
+
+#[cfg(test)]
+fn parse_claude_rollout(path: &Path) -> Option<CodexTask> {
+    let len = fs::metadata(path).ok()?.len();
+    let parser = update_claude_parser(path, None, len)?;
+    claude_task_from_parser(path, &parser).map(refresh_stale_status)
+}
+
 impl RolloutParser {
     fn process(&mut self, value: &Value) {
         let timestamp = value
@@ -567,6 +816,7 @@ fn task_from_parser(
         parser.project.clone()
     };
     Some(CodexTask {
+        product: ProductSource::Codex,
         id: if parser.turn_id.is_empty() {
             path.file_stem()?.to_string_lossy().into_owned()
         } else {
@@ -622,18 +872,46 @@ fn now_millis() -> i64 {
         .as_millis() as i64
 }
 
-fn notify_completions(app: &AppHandle, previous: &TaskSnapshot, current: &TaskSnapshot) {
+fn notify_completions(
+    app: &AppHandle,
+    previous: &TaskSnapshot,
+    current: &TaskSnapshot,
+    settings: &crate::refresh::RefreshSettings,
+) {
     for task in &current.tasks {
-        let was_running = previous
-            .tasks
-            .iter()
-            .find(|old| old.id == task.id)
-            .is_some_and(|old| is_active(&old.status));
-        if was_running && task.status == TaskStatus::Completed {
+        let previous_task = previous.tasks.iter().find(|old| old.id == task.id);
+        let was_running = previous_task.is_some_and(|old| is_active(&old.status));
+        let status_changed = previous_task.is_some_and(|old| old.status != task.status);
+        let notification_enabled = match (task.product, &task.status) {
+            (ProductSource::Claude, TaskStatus::Waiting) => settings.notify_claude_waiting,
+            (ProductSource::Claude, TaskStatus::Completed) => settings.notify_claude_completed,
+            (ProductSource::Claude, TaskStatus::Failed) => settings.notify_claude_failed,
+            (ProductSource::Claude, _) => false,
+            (ProductSource::Codex, TaskStatus::Completed) => true,
+            (ProductSource::Codex, _) => false,
+        };
+        if notification_enabled
+            && was_running
+            && status_changed
+            && matches!(
+                task.status,
+                TaskStatus::Completed | TaskStatus::Failed | TaskStatus::Waiting
+            )
+        {
+            let product = match task.product {
+                ProductSource::Codex => "Codex",
+                ProductSource::Claude => "Claude",
+            };
+            let state = match task.status {
+                TaskStatus::Completed => "已完成",
+                TaskStatus::Failed => "执行失败",
+                TaskStatus::Waiting => "等待操作",
+                _ => return,
+            };
             let _ = app
                 .notification()
                 .builder()
-                .title("Codex 已完成")
+                .title(format!("{product} {state}"))
                 .body(format!("{} · {}", task.project, task.title))
                 .show();
         }
@@ -655,6 +933,81 @@ mod tests {
     fn compacts_long_titles() {
         assert!(compact_title(&"好".repeat(60)).ends_with('…'));
         assert_eq!(compact_title("\n  short task\nmore"), "short task");
+    }
+
+    #[test]
+    fn parses_claude_code_session_without_copying_conversation_content() {
+        let path = std::env::temp_dir().join(format!(
+            "token-usage-claude-task-{}.jsonl",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"assistant\",\"sessionId\":\"14de44c6-fd5a-421b-a9e3-f1eb19f03270\",\"cwd\":\"/tmp/claude-project\",\"timestamp\":\"2099-07-23T00:00:01Z\",\"message\":{\"stop_reason\":\"tool_use\",\"content\":[{\"type\":\"tool_use\",\"name\":\"Bash\",\"input\":{\"secret\":\"must-not-be-copied\"}}]}}\n",
+                "{\"type\":\"assistant\",\"sessionId\":\"14de44c6-fd5a-421b-a9e3-f1eb19f03270\",\"cwd\":\"/tmp/claude-project\",\"timestamp\":\"2099-07-23T00:00:02Z\",\"message\":{\"stop_reason\":\"end_turn\",\"content\":[{\"type\":\"text\",\"text\":\"private response\"}]}}\n",
+                "{\"type\":\"custom-title\",\"sessionId\":\"14de44c6-fd5a-421b-a9e3-f1eb19f03270\",\"customTitle\":\"Claude provider test\"}\n"
+            ),
+        )
+        .expect("write Claude fixture");
+        let task = parse_claude_rollout(&path).expect("parse Claude task");
+        let _ = fs::remove_file(path);
+        assert_eq!(task.product, ProductSource::Claude);
+        assert_eq!(task.status, TaskStatus::Completed);
+        assert_eq!(task.title, "Claude provider test");
+        let encoded = serde_json::to_string(&task).expect("serialize task");
+        assert!(!encoded.contains("private response"));
+        assert!(!encoded.contains("must-not-be-copied"));
+    }
+
+    #[test]
+    fn claude_local_command_queue_does_not_reopen_a_completed_task() {
+        let path = std::env::temp_dir().join(format!(
+            "token-usage-claude-queue-{}.jsonl",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"assistant\",\"sessionId\":\"30b6e1dc-0eb0-4641-9df6-79edb4ebaeab\",\"timestamp\":\"2099-07-23T00:00:01Z\",\"message\":{\"stop_reason\":\"end_turn\",\"content\":[{\"type\":\"text\",\"text\":\"done\"}]}}\n",
+                "{\"type\":\"queue-operation\",\"operation\":\"enqueue\",\"sessionId\":\"30b6e1dc-0eb0-4641-9df6-79edb4ebaeab\",\"timestamp\":\"2099-07-23T00:01:00Z\"}\n",
+                "{\"type\":\"queue-operation\",\"operation\":\"dequeue\",\"sessionId\":\"30b6e1dc-0eb0-4641-9df6-79edb4ebaeab\",\"timestamp\":\"2099-07-23T00:01:01Z\"}\n"
+            ),
+        )
+        .expect("write Claude queue fixture");
+        let task = parse_claude_rollout(&path).expect("parse Claude queue fixture");
+        let _ = fs::remove_file(path);
+        assert_eq!(task.status, TaskStatus::Completed);
+        assert_eq!(task.completed_at, parse_timestamp("2099-07-23T00:00:01Z"));
+    }
+
+    #[test]
+    fn claude_waiting_notification_is_not_repeated_without_a_status_change() {
+        let task = CodexTask {
+            product: ProductSource::Claude,
+            id: "claude:waiting".into(),
+            session_id: "waiting".into(),
+            title: "等待用户输入".into(),
+            project: "Claude".into(),
+            status: TaskStatus::Waiting,
+            started_at: 1,
+            updated_at: 2,
+            completed_at: None,
+        };
+        let previous = TaskSnapshot {
+            tasks: vec![task.clone()],
+            queried_at: 2,
+        };
+        let current = TaskSnapshot {
+            tasks: vec![task],
+            queried_at: 3,
+        };
+        let previous_task = previous
+            .tasks
+            .iter()
+            .find(|old| old.id == current.tasks[0].id);
+        assert!(previous_task.is_some_and(|old| is_active(&old.status)));
+        assert!(!previous_task.is_some_and(|old| old.status != current.tasks[0].status));
     }
 
     #[test]
@@ -786,8 +1139,8 @@ mod tests {
         .expect("write rollout");
 
         let mut scanner = SessionScanner::default();
-        let first = scanner.scan(home.path());
-        let second = scanner.scan(home.path());
+        let first = scanner.scan(home.path(), false);
+        let second = scanner.scan(home.path(), false);
         assert_eq!(scanner.parse_count, 1);
         assert_eq!(first.tasks, second.tasks);
 
@@ -800,7 +1153,7 @@ mod tests {
             "{{\"timestamp\":\"2026-07-22T00:00:02Z\",\"type\":\"event_msg\",\"payload\":{{\"type\":\"task_complete\"}}}}"
         )
         .expect("append completion");
-        let third = scanner.scan(home.path());
+        let third = scanner.scan(home.path(), false);
         assert_eq!(scanner.parse_count, 2);
         assert_eq!(third.tasks[0].status, TaskStatus::Completed);
     }
@@ -819,7 +1172,7 @@ mod tests {
         )
         .expect("write rollout");
         let mut scanner = SessionScanner::default();
-        scanner.scan(home.path());
+        scanner.scan(home.path(), false);
         assert_eq!(scanner.parse_count, 1);
 
         fs::write(
@@ -827,7 +1180,7 @@ mod tests {
             "{\"id\":\"title-cache\",\"thread_name\":\"更新后的标题\",\"updated_at\":\"2026-07-22T00:01:00Z\"}\n",
         )
         .expect("write title index");
-        let updated = scanner.scan(home.path());
+        let updated = scanner.scan(home.path(), false);
         assert_eq!(scanner.parse_count, 1);
         assert_eq!(updated.tasks[0].title, "更新后的标题");
     }

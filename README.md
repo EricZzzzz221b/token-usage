@@ -4,13 +4,13 @@
 
 <h1 align="center">Token用量</h1>
 
-<p align="center"><strong>不用切回 Codex，也能随时知道额度还剩多少、任务做到哪了。</strong></p>
+<p align="center"><strong>不用切回 Codex 或 Claude，也能随时知道额度还剩多少、任务做到哪了。</strong></p>
 
-<p align="center">一款常驻 Windows 系统托盘与 macOS 状态栏的 Codex 用量和任务监控工具。</p>
+<p align="center">一款常驻 Windows 系统托盘与 macOS 状态栏的本地 AI 用量和任务监控工具。</p>
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="最新版本"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.1"><img src="https://img.shields.io/badge/macOS-v1.2.1-111111?logo=apple" alt="macOS v1.2.1"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.1"><img src="https://img.shields.io/badge/macOS-v1.2.5--beta.1-111111?logo=apple" alt="macOS v1.2.5-beta.1"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
 </p>
 
@@ -21,6 +21,8 @@
 </p>
 
 Token用量把 Codex 最常被打断查看的两件事放进一个小浮窗：**额度还有多少，以及正在运行的任务有没有完成**。你可以切到浏览器、设计软件或其他项目继续工作，通过状态栏就能看到任务处于思考、执行还是等待操作；任务完成后还会收到系统通知，并可从最近完成列表一键返回对应的 Codex 会话。
+
+macOS v1.2.5-beta.1 新增 Claude 测试支持：可在 Codex 与 Claude 之间切换，并只读扫描本机 Claude Code 已生成的会话事件。Anthropic 当前没有向第三方桌面工具提供可安全读取的个人订阅剩余额度 API，因此 Claude 页面会明确显示额度不可用，不会用本地 token 估算冒充官方百分比。
 
 应用会自动识别当前官方账号的使用模式。订阅账号显示套餐和 5 小时、7 天用量窗口；API 模式则按官方返回结果展示 Credits。所有凭据、用量和任务判断都在本机处理，不需要把 Access Token 或会话内容交给第三方服务。
 
@@ -59,6 +61,7 @@ Token用量把 Codex 最常被打断查看的两件事放进一个小浮窗：**
 - 详细和紧凑两种浮窗，可从浮窗或托盘快速切换
 - 立即刷新、自动刷新间隔、余额阈值和额度重置通知
 - 实时识别本机 Codex 任务，分别显示进行中任务、运行时长、最近 5 条完成记录和完成通知
+- macOS 测试版可独立启用 Claude Code 本地任务监控，并切换 Codex / Claude 来源
 - 进行中任务与最近完成记录均可一键打开对应 Codex 会话
 - 菜单栏在任务运行时同时显示活动任务数与剩余额度
 - 始终置顶、锁定位置、鼠标穿透、窗口拖动和登录时启动
@@ -88,12 +91,12 @@ Token用量把 Codex 最常被打断查看的两件事放进一个小浮窗：**
 
 | 平台                             | 状态   | 版本与下载                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS 13+ Apple Silicon          | 可下载 | [v1.2.1](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.1) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/TokenUsage_1.2.1_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/SHA256SUMS-1.2.1.txt)                                                                                                                                                                     |
+| macOS 13+ Apple Silicon          | 测试版 | [v1.2.5-beta.1](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.1) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/TokenUsage_1.2.5-beta.1_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/SHA256SUMS-1.2.5-beta.1.txt)                                                                                                                           |
 | Windows 11 / Windows 10 22H2 x64 | 可下载 | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
 
-### macOS v1.2.1
+### macOS v1.2.5-beta.1
 
-下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.1/TokenUsage_1.2.1_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。v1.2.1 增加进行中任务跳转，修复最近完成偶发消失、重置机会短暂缺失及折叠箭头跳动问题。
+下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/TokenUsage_1.2.5-beta.1_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。Claude 集成默认关闭，可在设置中启用；它只读取 `~/.claude/projects` 下 Claude Code 已生成的本地 JSONL 事件。
 
 安装前建议退出旧版；遇到任务状态或额度显示异常时，请在 [Issues](https://github.com/EricZzzzz221b/token-usage/issues) 中附上应用版本和复现步骤，但不要上传 `auth.json` 或完整 Codex 会话日志。
 
@@ -112,6 +115,7 @@ Windows 目前仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与�
 
 - OAuth 凭据只在本机内存中读取，只用于请求 `https://chatgpt.com/backend-api/wham/usage`。
 - 任务状态只增量读取本机 Codex 会话生命周期事件；不上传或另行保存完整提示词、回答、命令输出和文件内容。
+- Claude 集成默认关闭；启用后只读扫描 Claude Code 本地事件，不读取 Claude Desktop Cookie、IndexedDB 或内部数据库。
 - 不保存、记录或上传 Access Token、Refresh Token、邮箱、Account ID 或原始认证内容。
 - Windows 不读取 Credential Manager：目前没有经过验证的 Codex 凭据格式，因此不会猜测实现。
 - 本地历史只包含标准化用量，设置和缓存使用 Tauri 系统目录（Windows 为 AppData）。

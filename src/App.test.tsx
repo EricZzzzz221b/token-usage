@@ -37,6 +37,11 @@ const defaults = {
     notifyNinety: true,
     notifyHundred: true,
     notifyReset: false,
+    claudeEnabled: false,
+    defaultProduct: "codex" as const,
+    notifyClaudeWaiting: true,
+    notifyClaudeCompleted: true,
+    notifyClaudeFailed: true,
   }),
   saveInterval: vi.fn().mockResolvedValue({
     intervalMinutes: 5,
@@ -46,6 +51,11 @@ const defaults = {
     notifyNinety: true,
     notifyHundred: true,
     notifyReset: false,
+    claudeEnabled: false,
+    defaultProduct: "codex" as const,
+    notifyClaudeWaiting: true,
+    notifyClaudeCompleted: true,
+    notifyClaudeFailed: true,
   }),
   saveSettings: vi.fn(async (settings: RefreshSettings) => settings),
   loadAutostart: vi.fn().mockResolvedValue(false),
@@ -63,6 +73,13 @@ const defaults = {
   detectBackdrop: vi.fn().mockResolvedValue("light" as const),
   backdropPollIntervalMs: 10,
   loadAccountMode: vi.fn().mockResolvedValue({ mode: "subscription" as const }),
+  loadClaudeEnvironment: vi.fn().mockResolvedValue({
+    desktopInstalled: true,
+    desktopRunning: true,
+    codeAvailable: true,
+    taskSource: "local_claude_code_sessions" as const,
+    usageStatus: "unavailable" as const,
+  }),
 };
 
 afterEach(() => {
@@ -71,6 +88,68 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("lets the user select Claude even before the integration is enabled", async () => {
+    render(<App {...defaults} />);
+    const claude = await screen.findByRole("button", { name: "Claude" });
+    expect(claude).not.toBeDisabled();
+    fireEvent.click(claude);
+    expect(
+      await screen.findByText(/启用 Claude 集成后|Enable Claude integration/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /自动|Auto/ })).not.toBeInTheDocument();
+  });
+
+  it("shows a transparent Claude usage fallback without inventing a percentage", async () => {
+    render(
+      <App
+        {...defaults}
+        loadSettings={vi.fn().mockResolvedValue({
+          ...(await defaults.loadSettings()),
+          claudeEnabled: true,
+          defaultProduct: "claude",
+        })}
+      />,
+    );
+    expect(await screen.findByText(/Claude 共享额度|Claude shared usage/)).toBeInTheDocument();
+    expect(screen.getByText(/不显示估算百分比|No estimated percentage/)).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("keeps compact task status scoped to the selected product", async () => {
+    render(
+      <App
+        {...defaults}
+        loadWindowPreferences={vi.fn().mockResolvedValue({
+          ...windowPreferences,
+          mode: "compact",
+        })}
+        loadSettings={vi.fn().mockResolvedValue({
+          ...(await defaults.loadSettings()),
+          claudeEnabled: true,
+          defaultProduct: "claude",
+        })}
+        loadTasks={vi.fn().mockResolvedValue({
+          queriedAt: Date.now(),
+          tasks: [
+            {
+              product: "codex",
+              id: "codex-active",
+              sessionId: "codex-active",
+              title: "Codex active task",
+              project: "Codex",
+              status: "executing",
+              startedAt: Date.now() - 1_000,
+              updatedAt: Date.now(),
+            },
+          ],
+        })}
+      />,
+    );
+    expect(await screen.findByText(/准备接收任务|Ready for a new task/)).toBeInTheDocument();
+    expect(screen.queryByText(/执行中|Executing/)).not.toBeInTheDocument();
+    expect(screen.getByText("C")).toBeInTheDocument();
+    expect(screen.queryByText(/Subscription|订阅/)).not.toBeInTheDocument();
+  });
   it("renders remaining quota as a countdown from 100 to 0", async () => {
     render(<App {...defaults} />);
     const progressbars = await screen.findAllByRole("progressbar");
@@ -258,7 +337,7 @@ describe("App", () => {
     expect(screen.getByText("完成任务 5")).toBeInTheDocument();
     expect(screen.queryByText("完成任务 6")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /完成任务 3.*Codex/ }));
-    expect(openTask).toHaveBeenCalledWith("019f0000-0000-7000-8000-000000000002");
+    expect(openTask).toHaveBeenCalledWith("codex", "019f0000-0000-7000-8000-000000000002");
   });
 
   it("opens an active task in its Codex thread", async () => {
@@ -286,7 +365,53 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /任务|Tasks/ }));
     fireEvent.click(screen.getByRole("button", { name: /修复重置机会.*Codex/ }));
-    expect(openTask).toHaveBeenCalledWith("019f0000-0000-7000-8000-000000000099");
+    expect(openTask).toHaveBeenCalledWith("codex", "019f0000-0000-7000-8000-000000000099");
+  });
+
+  it("strictly separates Claude and Codex tasks and keeps Codex tasks clickable", async () => {
+    const openTask = vi.fn().mockResolvedValue(undefined);
+    const now = Date.now();
+    render(
+      <App
+        {...defaults}
+        openTask={openTask}
+        loadTasks={vi.fn().mockResolvedValue({
+          queriedAt: now,
+          tasks: [
+            {
+              product: "codex" as const,
+              id: "codex-active",
+              sessionId: "019f0000-0000-7000-8000-000000000088",
+              title: "Codex 独立任务",
+              project: "Token用量",
+              status: "executing" as const,
+              startedAt: now - 5_000,
+              updatedAt: now,
+            },
+            {
+              product: "claude" as const,
+              id: "claude-active",
+              sessionId: "14de44c6-fd5a-421b-a9e3-f1eb19f03270",
+              title: "Claude 独立任务",
+              project: "Token用量",
+              status: "thinking" as const,
+              startedAt: now - 4_000,
+              updatedAt: now,
+            },
+          ],
+        })}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: /任务|Tasks/ }));
+    expect(await screen.findByText("Codex 独立任务")).toBeInTheDocument();
+    expect(screen.queryByText("Claude 独立任务")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Codex 独立任务.*Codex/ }));
+    expect(openTask).toHaveBeenCalledWith("codex", "019f0000-0000-7000-8000-000000000088");
+
+    fireEvent.click(screen.getByRole("button", { name: "Claude" }));
+    expect(await screen.findByText("Claude 独立任务")).toBeInTheDocument();
+    expect(screen.queryByText("Codex 独立任务")).not.toBeInTheDocument();
   });
 
   it("subscribes before loading the initial task snapshot", async () => {

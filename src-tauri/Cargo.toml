@@ -1,8 +1,8 @@
 [package]
 name = "token-usage"
-version = "1.2.1"
+version = "1.2.5-beta.1"
 authors = ["Eric Zhang"]
-description = "A cross-platform monitor for Codex subscription token usage"
+description = "A cross-platform monitor for Codex and Claude usage and tasks"
 edition = "2021"
 rust-version = "1.85"
 
