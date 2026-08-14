@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.1"><img src="https://img.shields.io/badge/macOS-v1.2.5--beta.1-111111?logo=apple" alt="macOS v1.2.5-beta.1"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.2"><img src="https://img.shields.io/badge/macOS-v1.2.5--beta.2-111111?logo=apple" alt="macOS v1.2.5-beta.2"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
 </p>
 
@@ -91,12 +91,12 @@ The app detects whether the official account is using a subscription or API mode
 
 | Platform                         | Status    | Version and download                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS 13+ Apple Silicon          | Beta      | [v1.2.5-beta.1](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.1) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/TokenUsage_1.2.5-beta.1_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/SHA256SUMS-1.2.5-beta.1.txt)                                                                                                                           |
+| macOS 13+ Apple Silicon          | Beta      | [v1.2.5-beta.2](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.2) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/TokenUsage_1.2.5-beta.2_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/SHA256SUMS-1.2.5-beta.2.txt)                                                                                                                           |
 | Windows 11 / Windows 10 22H2 x64 | Available | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
 
-### macOS v1.2.5-beta.1
+### macOS v1.2.5-beta.2
 
-Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/TokenUsage_1.2.5-beta.1_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. Claude integration is disabled by default and can be enabled in Settings. It only reads local JSONL events already created under `~/.claude/projects`. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
+Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/TokenUsage_1.2.5-beta.2_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. Claude integration is disabled by default and can be enabled in Settings. It only reads local JSONL events already created under `~/.claude/projects`. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
 ### Windows v1.1.5
 

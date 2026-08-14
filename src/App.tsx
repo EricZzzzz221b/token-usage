@@ -174,7 +174,7 @@ export default function App({
   authorizeUsage = enableUsage,
   resizeView = resizeWindowForView,
   detectBackdrop = getBackdropTone,
-  backdropPollIntervalMs = 1500,
+  backdropPollIntervalMs = 150,
   loadTasks = loadTasksSafely,
   subscribeTasks = subscribeTasksSafely,
   loadAccountMode = loadAccountModeSafely,
@@ -209,6 +209,7 @@ export default function App({
   useEffect(() => {
     let active = true;
     let detecting = false;
+    let hasAppliedTone = false;
     let lastCandidate: BackdropTone | undefined;
     let matchingSamples = 0;
     const detect = () => {
@@ -221,6 +222,11 @@ export default function App({
           else {
             lastCandidate = next;
             matchingSamples = 1;
+          }
+          if (!hasAppliedTone) {
+            hasAppliedTone = true;
+            setBackdropTone(next);
+            return;
           }
           if (matchingSamples >= 2) setBackdropTone(next);
         })

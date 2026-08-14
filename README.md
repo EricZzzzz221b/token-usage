@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="最新版本"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.1"><img src="https://img.shields.io/badge/macOS-v1.2.5--beta.1-111111?logo=apple" alt="macOS v1.2.5-beta.1"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.2"><img src="https://img.shields.io/badge/macOS-v1.2.5--beta.2-111111?logo=apple" alt="macOS v1.2.5-beta.2"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
 </p>
 
@@ -91,12 +91,12 @@ macOS v1.2.5-beta.1 新增 Claude 测试支持：可在 Codex 与 Claude 之间�
 
 | 平台                             | 状态   | 版本与下载                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS 13+ Apple Silicon          | 测试版 | [v1.2.5-beta.1](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.1) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/TokenUsage_1.2.5-beta.1_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/SHA256SUMS-1.2.5-beta.1.txt)                                                                                                                           |
+| macOS 13+ Apple Silicon          | 测试版 | [v1.2.5-beta.2](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.2) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/TokenUsage_1.2.5-beta.2_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/SHA256SUMS-1.2.5-beta.2.txt)                                                                                                                           |
 | Windows 11 / Windows 10 22H2 x64 | 可下载 | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
 
-### macOS v1.2.5-beta.1
+### macOS v1.2.5-beta.2
 
-下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.1/TokenUsage_1.2.5-beta.1_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。Claude 集成默认关闭，可在设置中启用；它只读取 `~/.claude/projects` 下 Claude Code 已生成的本地 JSONL 事件。
+下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/TokenUsage_1.2.5-beta.2_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。Claude 集成默认关闭，可在设置中启用；它只读取 `~/.claude/projects` 下 Claude Code 已生成的本地 JSONL 事件。
 
 安装前建议退出旧版；遇到任务状态或额度显示异常时，请在 [Issues](https://github.com/EricZzzzz221b/token-usage/issues) 中附上应用版本和复现步骤，但不要上传 `auth.json` 或完整 Codex 会话日志。
 

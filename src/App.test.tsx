@@ -509,8 +509,10 @@ describe("App", () => {
   });
 
   it("adapts to a dark surface behind the widget", async () => {
-    render(<App {...defaults} detectBackdrop={vi.fn().mockResolvedValue("dark")} />);
+    const detectBackdrop = vi.fn().mockResolvedValue("dark");
+    render(<App {...defaults} detectBackdrop={detectBackdrop} backdropPollIntervalMs={10_000} />);
     await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-dark"));
+    expect(detectBackdrop).toHaveBeenCalledTimes(1);
   });
 
   it("adapts to a light surface behind the widget", async () => {
