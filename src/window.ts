@@ -29,6 +29,10 @@ export function startWindowDrag(): Promise<void> {
   return invoke<void>("start_window_drag");
 }
 
+export function hideWindowToTray(): Promise<void> {
+  return invoke<void>("hide_main_window");
+}
+
 export function resizeWindowForView(view: "compact" | "detailed" | "settings"): Promise<void> {
   return invoke<void>("resize_window_for_view", { view });
 }

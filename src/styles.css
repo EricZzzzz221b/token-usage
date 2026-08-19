@@ -193,9 +193,13 @@ button {
   background: transparent;
   cursor: default;
 }
-.compact-mode-toggle {
+.compact-actions {
   position: absolute;
   right: 10px;
+  display: flex;
+  gap: 5px;
+}
+.compact-action {
   width: 27px;
   height: 27px;
   display: grid;
@@ -212,14 +216,14 @@ button {
     background-color 120ms ease,
     transform 120ms ease;
 }
-.compact-mode-toggle:hover {
+.compact-action:hover {
   color: var(--icon-hover);
   background: rgba(255, 255, 255, 0.24);
 }
-.compact-mode-toggle:active {
+.compact-action:active {
   transform: scale(0.94);
 }
-.compact-mode-toggle svg {
+.compact-action svg {
   width: 14px;
   height: 14px;
   fill: none;
@@ -229,7 +233,7 @@ button {
   stroke-linejoin: round;
 }
 .compact-state-button:focus-visible,
-.compact-mode-toggle:focus-visible,
+.compact-action:focus-visible,
 .icon-action:focus-visible,
 .text-action:focus-visible,
 .row-button:focus-visible,
@@ -713,7 +717,7 @@ footer,
 .compact-panel {
   justify-content: flex-start;
   gap: 10px;
-  padding: 0 54px 0 16px;
+  padding: 0 88px 0 16px;
 }
 .compact-primary {
   min-width: 0;
@@ -766,7 +770,7 @@ footer,
   background: var(--track-color);
   text-align: center;
 }
-.compact-mode-toggle {
+.compact-action {
   right: 8px;
   width: 40px;
   height: 40px;

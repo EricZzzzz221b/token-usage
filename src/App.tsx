@@ -34,6 +34,7 @@ import {
 import {
   getBackdropTone,
   getWindowPreferences,
+  hideWindowToTray,
   onWindowModeChanged,
   onWindowPreferences,
   resizeWindowForView,
@@ -104,6 +105,7 @@ interface AppProps {
   loadWindowPreferences?: () => Promise<WindowPreferences>;
   saveWindowPreferences?: (preferences: WindowPreferences) => Promise<WindowPreferences>;
   dragWindow?: () => Promise<void>;
+  hideWindow?: () => Promise<void>;
   subscribeWindowPreferences?: (
     handler: (preferences: WindowPreferences) => void,
   ) => Promise<() => void>;
@@ -166,6 +168,7 @@ export default function App({
   loadWindowPreferences = getWindowPreferences,
   saveWindowPreferences = setWindowPreferences,
   dragWindow = startWindowDrag,
+  hideWindow = hideWindowToTray,
   subscribeWindowPreferences = onWindowPreferences,
   subscribeWindowModeChanged = onWindowModeChanged,
   loadAutostart = getAutostart,
@@ -441,6 +444,9 @@ export default function App({
     void updatePreferences({ mode: nextMode });
     void resizeView(nextMode);
   };
+  const hideToStatusBar = () => {
+    void hideWindow();
+  };
 
   const drag = (event: React.MouseEvent) => {
     if (event.button === 0 && !preferences.locked) void dragWindow();
@@ -494,18 +500,28 @@ export default function App({
           ) : readyWindows[0] ? (
             <span className="compact-quota">{`${windowShortLabel(readyWindows[0].id)} ${remainingPercent(readyWindows[0].usedPercent)}%`}</span>
           ) : null}
-          <button
-            className="compact-mode-toggle"
-            type="button"
-            aria-label={t("switchToStandard")}
-            title={t("switchToStandard")}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={toggleWindowMode}
-          >
-            <svg aria-hidden="true" viewBox="0 0 16 16">
-              <path d="M2.5 5.25h8m-2.5-2.5 2.5 2.5-2.5 2.5M13.5 10.75h-8m2.5-2.5-2.5 2.5 2.5 2.5" />
-            </svg>
-          </button>
+          <div className="compact-actions" onMouseDown={(event) => event.stopPropagation()}>
+            <button
+              className="compact-action"
+              type="button"
+              aria-label={t("hideToStatusBar")}
+              title={t("hideToStatusBar")}
+              onClick={hideToStatusBar}
+            >
+              <HideToTrayIcon />
+            </button>
+            <button
+              className="compact-action"
+              type="button"
+              aria-label={t("switchToStandard")}
+              title={t("switchToStandard")}
+              onClick={toggleWindowMode}
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M2.5 5.25h8m-2.5-2.5 2.5 2.5-2.5 2.5M13.5 10.75h-8m2.5-2.5-2.5 2.5 2.5 2.5" />
+              </svg>
+            </button>
+          </div>
         </section>
       </main>
     );
@@ -534,6 +550,15 @@ export default function App({
             )}
           </div>
           <div className="title-actions" onMouseDown={(event) => event.stopPropagation()}>
+            <button
+              className="icon-action"
+              type="button"
+              aria-label={t("hideToStatusBar")}
+              title={t("hideToStatusBar")}
+              onClick={hideToStatusBar}
+            >
+              <HideToTrayIcon />
+            </button>
             {screen === "settings" ? (
               <button className="text-action" type="button" onClick={() => void closeSettings()}>
                 {t("done")}
@@ -751,6 +776,14 @@ export default function App({
         )}
       </section>
     </main>
+  );
+}
+
+function HideToTrayIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 16 16">
+      <path d="M8 2.5v7m-3-3 3 3 3-3M3 12.5h10" />
+    </svg>
   );
 }
 

@@ -67,6 +67,7 @@ const defaults = {
   loadWindowPreferences: vi.fn().mockResolvedValue(windowPreferences),
   saveWindowPreferences: vi.fn().mockResolvedValue(windowPreferences),
   dragWindow: vi.fn().mockResolvedValue(undefined),
+  hideWindow: vi.fn().mockResolvedValue(undefined),
   subscribeWindowPreferences: vi.fn().mockResolvedValue(vi.fn()),
   subscribeWindowModeChanged: vi.fn().mockResolvedValue(vi.fn()),
   resizeView: vi.fn().mockResolvedValue(undefined),
@@ -88,6 +89,41 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("hides the detailed widget while leaving the status bar process running", async () => {
+    const hideWindow = vi.fn().mockResolvedValue(undefined);
+    render(<App {...defaults} hideWindow={hideWindow} />);
+
+    const hide = await screen.findByRole("button", {
+      name: /隐藏浮窗，仅保留状态栏|Hide widget and keep the menu bar or tray active/,
+    });
+    fireEvent.click(hide);
+
+    expect(hideWindow).toHaveBeenCalledOnce();
+  });
+
+  it("can hide the compact widget to the status bar", async () => {
+    const hideWindow = vi.fn().mockResolvedValue(undefined);
+    render(
+      <App
+        {...defaults}
+        hideWindow={hideWindow}
+        loadWindowPreferences={vi.fn().mockResolvedValue({
+          ...windowPreferences,
+          mode: "compact",
+        })}
+      />,
+    );
+
+    await screen.findByRole("button", {
+      name: /切换到标准模式|Switch to standard mode/,
+    });
+    const hide = screen.getByRole("button", {
+      name: /隐藏浮窗，仅保留状态栏|Hide widget and keep the menu bar or tray active/,
+    });
+    fireEvent.click(hide);
+
+    expect(hideWindow).toHaveBeenCalledOnce();
+  });
   it("lets the user select Claude even before the integration is enabled", async () => {
     render(<App {...defaults} />);
     const claude = await screen.findByRole("button", { name: "Claude" });

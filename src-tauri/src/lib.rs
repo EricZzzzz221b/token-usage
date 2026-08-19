@@ -214,6 +214,14 @@ fn set_window_preferences(
 }
 
 #[tauri::command]
+fn hide_main_window(app: tauri::AppHandle) -> Result<(), UsageErrorPayload> {
+    window::main_window(&app)
+        .map_err(UsageErrorPayload::from)?
+        .hide()
+        .map_err(|_| UsageErrorPayload::from(error::UsageError::WindowUnavailable))
+}
+
+#[tauri::command]
 fn start_window_drag(app: tauri::AppHandle) -> Result<(), UsageErrorPayload> {
     let preferences = window::load_preferences(&app);
     if !preferences.locked && !preferences.click_through {
@@ -294,6 +302,7 @@ pub fn run() {
             export_diagnostic_report,
             get_window_preferences,
             set_window_preferences,
+            hide_main_window,
             start_window_drag,
             resize_window_for_view,
             backdrop_is_dark
