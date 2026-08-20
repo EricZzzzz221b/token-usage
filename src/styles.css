@@ -194,43 +194,50 @@ button {
   cursor: default;
 }
 .compact-actions {
-  position: absolute;
-  right: 10px;
   display: flex;
-  gap: 5px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding-left: 7px;
+  border-left: 1px solid var(--divider-color);
 }
 .compact-action {
-  width: 27px;
-  height: 27px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(30, 45, 60, 0.08);
-  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 11%, transparent);
+  border-radius: 8px;
   color: var(--icon-muted);
-  background: rgba(255, 255, 255, 0.13);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--surface-color) 78%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
   cursor: default;
   transition:
     color 120ms ease,
+    border-color 120ms ease,
     background-color 120ms ease,
     transform 120ms ease;
 }
 .compact-action:hover {
   color: var(--icon-hover);
-  background: rgba(255, 255, 255, 0.24);
+  border-color: color-mix(in srgb, var(--action-color) 28%, transparent);
+  background: color-mix(in srgb, var(--action-color) 11%, var(--surface-color));
 }
 .compact-action:active {
   transform: scale(0.94);
 }
 .compact-action svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.35;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+.compact-hide-action {
+  color: var(--action-color);
 }
 .compact-state-button:focus-visible,
 .compact-action:focus-visible,
@@ -716,8 +723,8 @@ footer,
 /* Status-first monitor layout */
 .compact-panel {
   justify-content: flex-start;
-  gap: 10px;
-  padding: 0 88px 0 16px;
+  gap: 9px;
+  padding: 0 12px 0 16px;
 }
 .compact-primary {
   min-width: 0;
@@ -728,11 +735,15 @@ footer,
 }
 .compact-status-copy {
   min-width: 0;
+  overflow: hidden;
   display: flex;
   align-items: baseline;
   gap: 7px;
 }
 .compact-status-copy strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 13px;
   font-weight: 720;
   white-space: nowrap;
@@ -744,6 +755,11 @@ footer,
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.compact-status-copy span {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .compact-quota {
   flex: 0 0 auto;
@@ -769,12 +785,6 @@ footer,
   border-radius: 9px;
   background: var(--track-color);
   text-align: center;
-}
-.compact-action {
-  right: 8px;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
 }
 .status-signal {
   width: 10px;

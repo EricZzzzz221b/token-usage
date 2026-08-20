@@ -502,7 +502,7 @@ export default function App({
           ) : null}
           <div className="compact-actions" onMouseDown={(event) => event.stopPropagation()}>
             <button
-              className="compact-action"
+              className="compact-action compact-hide-action"
               type="button"
               aria-label={t("hideToStatusBar")}
               title={t("hideToStatusBar")}
@@ -511,7 +511,7 @@ export default function App({
               <HideToTrayIcon />
             </button>
             <button
-              className="compact-action"
+              className="compact-action compact-mode-action"
               type="button"
               aria-label={t("switchToStandard")}
               title={t("switchToStandard")}
