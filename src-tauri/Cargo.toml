@@ -1,6 +1,6 @@
 [package]
 name = "token-usage"
-version = "1.2.5-beta.2"
+version = "1.2.6"
 authors = ["Eric Zhang"]
 description = "A cross-platform monitor for Codex and Claude usage and tasks"
 edition = "2021"

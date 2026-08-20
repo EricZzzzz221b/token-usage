@@ -9,7 +9,7 @@ on:
       tag:
         description: Windows release tag
         required: true
-        default: windows-v1.1.5
+        default: windows-v1.2.6
 
 permissions:
   contents: write

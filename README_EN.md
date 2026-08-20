@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="Latest release"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.2"><img src="https://img.shields.io/badge/macOS-v1.2.5--beta.2-111111?logo=apple" alt="macOS v1.2.5-beta.2"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5"><img src="https://img.shields.io/badge/Windows-v1.1.5-0078D4?logo=windows11" alt="Windows v1.1.5"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.6"><img src="https://img.shields.io/badge/macOS-v1.2.6-111111?logo=apple" alt="macOS v1.2.6"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.6"><img src="https://img.shields.io/badge/Windows-v1.2.6-0078D4?logo=windows11" alt="Windows v1.2.6"></a>
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 
 Token Usage puts the two Codex details you check most often into one small widget: **how much quota remains, and whether your current tasks are still running**. Keep working in your browser, editor, or design tool while the menu bar shows whether Codex is thinking, executing a tool, or waiting for input. When a task finishes, the app can notify you and open the matching Codex conversation from the recent list.
 
-macOS v1.2.5-beta.1 adds experimental Claude support. You can switch between Codex and Claude and opt in to read-only monitoring of local Claude Code session events. Anthropic does not currently expose a safe third-party API for personal subscription quota, so the Claude view reports usage as unavailable instead of presenting an estimated percentage.
+v1.2.6 adds a hide-to-status-bar feature: the widget can be hidden while the macOS menu bar or Windows tray, background refresh, task monitoring, and notifications remain active. Claude support remains available. You can switch between Codex and Claude and opt in to read-only monitoring of local Claude Code session events. Anthropic does not currently expose a safe third-party API for personal subscription quota, so the Claude view reports usage as unavailable instead of presenting an estimated percentage.
 
 The app detects whether the official account is using a subscription or API mode. Subscription accounts show plan information and usage windows; API mode shows Credits when the official response provides them. Credentials, usage data, and task detection stay on your Mac or PC.
 
@@ -50,6 +50,7 @@ The app detects whether the official account is using a subscription or API mode
 - Use compact mode for only the current task, elapsed time, and quota
 - Keep the widget on top, lock its position, enable click-through, or launch it at login
 - Choose whether the macOS app appears in the Dock
+- Hide the widget while keeping the menu bar or tray status available
 - Choose the 5-hour or 7-day value shown in the tray or menu bar
 
 ## Features
@@ -91,16 +92,16 @@ The app detects whether the official account is using a subscription or API mode
 
 | Platform                         | Status    | Version and download                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS 13+ Apple Silicon          | Beta      | [v1.2.5-beta.2](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.5-beta.2) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/TokenUsage_1.2.5-beta.2_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/SHA256SUMS-1.2.5-beta.2.txt)                                                                                                                           |
-| Windows 11 / Windows 10 22H2 x64 | Available | [v1.1.5](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/TokenUsage_Windows_1.1.5_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.1.5/SHA256SUMS-Windows-1.1.5.txt) |
+| macOS 13+ Apple Silicon          | Available | [v1.2.6](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.6) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.6/TokenUsage_1.2.6_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.6/SHA256SUMS-1.2.6.txt)                                                                                                                                                                     |
+| Windows 11 / Windows 10 22H2 x64 | Available | [v1.2.6](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.6) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.6/TokenUsage_Windows_1.2.6_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.6/TokenUsage_Windows_1.2.6_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.6/SHA256SUMS-Windows-1.2.6.txt) |
 
-### macOS v1.2.5-beta.2
+### macOS v1.2.6
 
-Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.5-beta.2/TokenUsage_1.2.5-beta.2_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. Claude integration is disabled by default and can be enabled in Settings. It only reads local JSONL events already created under `~/.claude/projects`. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
+Download the [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.6/TokenUsage_1.2.6_arm64.dmg), open it, and drag `Token用量.app` into `Applications`. Claude integration is disabled by default and can be enabled in Settings. It only reads local JSONL events already created under `~/.claude/projects`. The build is ad-hoc signed and not Apple-notarized; on first launch, right-click the app in Finder, choose **Open**, and confirm once more.
 
-### Windows v1.1.5
+### Windows v1.2.6
 
-The Windows release supports x64 only. Prefer the MSI, or use the NSIS setup EXE. The installers are unsigned, so verify the published SHA-256 before using **More info → Run anyway** in SmartScreen. The embedded WebView2 bootstrapper starts Microsoft's installation flow if the runtime is missing. Uninstall from **Settings → Apps → Installed apps**. See the [Windows v1.1.5 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.1.5) for details.
+The Windows release supports x64 only. Prefer the MSI, or use the NSIS setup EXE. The installers are unsigned, so verify the published SHA-256 before using **More info → Run anyway** in SmartScreen. The embedded WebView2 bootstrapper starts Microsoft's installation flow if the runtime is missing. Uninstall from **Settings → Apps → Installed apps**. See the [Windows v1.2.6 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.6) for details.
 
 ## Privacy
 

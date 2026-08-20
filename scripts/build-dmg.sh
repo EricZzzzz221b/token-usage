@@ -28,7 +28,7 @@ Token用量 ${VERSION} 安装说明
 3. 本版本适用于 Apple Silicon（M1/M2/M3/M4/M5）Mac，要求 macOS 13 或更高版本。
 4. Codex 用量查询只读取本机 Codex/ChatGPT OAuth 登录状态，不会上传或保存凭据。
 5. Claude 集成默认关闭；启用后只读取本机 Claude Code 会话状态，不读取 Claude Desktop Cookie、内部数据库或完整对话。
-6. 本测试版暂不显示 Claude 订阅额度百分比，避免用估算数据冒充官方额度。
+6. 当前版本暂不显示 Claude 订阅额度百分比，避免用估算数据冒充官方额度。
 EOF
 rm -f "$OUT"
 hdiutil create -volname "Token Usage" -srcfolder "$STAGE" -ov -format UDZO "$OUT"
