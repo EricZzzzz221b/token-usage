@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 use crate::{
     credentials,
     error::UsageError,
+    history,
     model::{RateLimitResetCredits, UsageSnapshot},
     tray,
     usage::UsageClient,
@@ -108,6 +109,7 @@ struct CoordinatorState {
     notified: std::collections::HashSet<String>,
     last_reset_credits: Option<RateLimitResetCredits>,
     last_reset_credits_at: Option<i64>,
+    history_appends_since_compaction: usize,
 }
 
 #[derive(Clone)]
@@ -237,7 +239,11 @@ impl RefreshCoordinator {
                         }
                     }
                     process_notifications(app, &mut state, &snapshot);
-                    append_snapshot(app, &snapshot);
+                    history::append_snapshot(
+                        app,
+                        &snapshot,
+                        &mut state.history_appends_since_compaction,
+                    );
                     state.last_good = Some(snapshot);
                     state.last_error = None;
                     state.transient_failures = 0;
@@ -329,35 +335,6 @@ fn process_notifications(app: &AppHandle, state: &mut CoordinatorState, snapshot
             ))
         })
     });
-}
-
-fn append_snapshot(app: &AppHandle, snapshot: &UsageSnapshot) {
-    let Ok(dir) = app.path().app_data_dir() else {
-        return;
-    };
-    if fs::create_dir_all(&dir).is_err() {
-        return;
-    }
-    let path = dir.join("usage-history.jsonl");
-    let cutoff = now_millis() - 30 * 24 * 60 * 60 * 1_000;
-    let history = fs::read_to_string(&path).unwrap_or_default();
-    let mut retained = history
-        .lines()
-        .filter_map(|line| serde_json::from_str::<UsageSnapshot>(line).ok())
-        .filter(|item| item.queried_at >= cutoff)
-        .collect::<Vec<_>>();
-    retained.push(snapshot.clone());
-    if retained.len() > 8_640 {
-        retained.drain(..retained.len() - 8_640);
-    }
-    let mut output = Vec::new();
-    for item in retained {
-        if let Ok(mut line) = serde_json::to_vec(&item) {
-            line.push(b'\n');
-            output.extend(line);
-        }
-    }
-    let _ = fs::write(path, output);
 }
 
 fn valid_settings(settings: &RefreshSettings) -> bool {
@@ -465,6 +442,7 @@ mod tests {
             notified: Default::default(),
             last_reset_credits: None,
             last_reset_credits_at: None,
+            history_appends_since_compaction: 0,
         };
         match view_from_state(&state, 2_000) {
             UsageView::Ready { last_error, .. } => {
@@ -485,6 +463,7 @@ mod tests {
             notified: Default::default(),
             last_reset_credits: None,
             last_reset_credits_at: None,
+            history_appends_since_compaction: 0,
         };
         match view_from_state(&state, 2_000) {
             UsageView::Error { code, .. } => assert_eq!(code, "authentication_expired"),
