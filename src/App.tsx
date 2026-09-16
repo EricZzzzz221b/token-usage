@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
+import HistoryPanel from "./HistoryPanel";
+import {
+  clearUsageHistory,
+  exportUsageHistory,
+  getUsageHistory,
+  type HistoryRange,
+  type UsageHistorySeries,
+} from "./history";
 import {
   getRefreshSettings,
   getUsage,
@@ -18,9 +26,12 @@ import {
   getAccountMode,
   getAutostart,
   getClaudeEnvironment,
+  getDiagnosticReport,
+  exportDiagnosticReport,
   setAutostart,
   type AccountMode,
   type ClaudeEnvironment,
+  type DiagnosticReport,
 } from "./system";
 import {
   getTasks,
@@ -124,6 +135,11 @@ interface AppProps {
   loadAccountMode?: () => Promise<{ mode: AccountMode }>;
   loadClaudeEnvironment?: () => Promise<ClaudeEnvironment>;
   openTask?: (product: ProductSource, sessionId: string) => Promise<void>;
+  loadHistory?: (range: HistoryRange, windowId: string) => Promise<UsageHistorySeries>;
+  exportHistory?: (range: HistoryRange, windowId: string) => Promise<boolean>;
+  clearHistory?: () => Promise<void>;
+  loadDiagnosticReport?: () => Promise<DiagnosticReport>;
+  exportDiagnosticReport?: () => Promise<boolean>;
 }
 
 function remainingPercent(usedPercent: number) {
@@ -183,6 +199,11 @@ export default function App({
   loadAccountMode = loadAccountModeSafely,
   loadClaudeEnvironment = getClaudeEnvironment,
   openTask: openTaskSession = openTask,
+  loadHistory = getUsageHistory,
+  exportHistory = exportUsageHistory,
+  clearHistory = clearUsageHistory,
+  loadDiagnosticReport = getDiagnosticReport,
+  exportDiagnosticReport: saveDiagnosticReport = exportDiagnosticReport,
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
@@ -208,6 +229,9 @@ export default function App({
   // Keep this above the detailed/compact branches so changing views does not
   // recreate the disclosure and discard the user's choice.
   const [resetsExpanded, setResetsExpanded] = useState(false);
+  const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport>();
+  const [diagnosticLoading, setDiagnosticLoading] = useState(false);
+  const [diagnosticError, setDiagnosticError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -746,7 +770,62 @@ export default function App({
                 <span>{t("language")}</span>
                 <span className="row-value">{i18n.language === "zh" ? "简体中文" : "English"}</span>
               </button>
+              <button
+                className="setting-row row-button"
+                type="button"
+                onClick={() => {
+                  setDiagnosticLoading(true);
+                  setDiagnosticError(false);
+                  void loadDiagnosticReport()
+                    .then(setDiagnosticReport)
+                    .catch(() => setDiagnosticError(true))
+                    .finally(() => setDiagnosticLoading(false));
+                }}
+              >
+                <span>{t("diagnostics")}</span>
+                <span className="row-value">
+                  {diagnosticLoading ? t("diagnosticsLoading") : t("diagnosticsView")}
+                </span>
+              </button>
             </SettingsGroup>
+            {(diagnosticReport || diagnosticError) && (
+              <section className="diagnostic-panel" aria-label={t("diagnostics")}>
+                {diagnosticError ? (
+                  <p role="alert">{t("diagnosticsFailed")}</p>
+                ) : diagnosticReport ? (
+                  <>
+                    <dl>
+                      <div>
+                        <dt>{t("diagnosticsVersion")}</dt>
+                        <dd>{diagnosticReport.appVersion}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("diagnosticsOs")}</dt>
+                        <dd>{diagnosticReport.os}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("diagnosticsCredential")}</dt>
+                        <dd>{diagnosticReport.credential.status}</dd>
+                      </div>
+                      <div>
+                        <dt>{t("diagnosticsUsage")}</dt>
+                        <dd>{diagnosticReport.usageStatus}</dd>
+                      </div>
+                    </dl>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDiagnosticError(false);
+                        void saveDiagnosticReport().catch(() => setDiagnosticError(true));
+                      }}
+                    >
+                      {t("diagnosticsExport")}
+                    </button>
+                    <p>{t("diagnosticsPrivacy")}</p>
+                  </>
+                ) : null}
+              </section>
+            )}
             <div className="about-meta">
               <span>
                 {t("appName")} v{appVersion}
@@ -772,6 +851,9 @@ export default function App({
             claudeEnabled={settings.claudeEnabled}
             resetsExpanded={resetsExpanded}
             onResetsExpandedChange={setResetsExpanded}
+            loadHistory={loadHistory}
+            exportHistory={exportHistory}
+            clearHistory={clearHistory}
           />
         )}
       </section>
@@ -804,6 +886,9 @@ function DashboardContent({
   selectedProduct,
   onSelectedProductChange,
   claudeEnabled,
+  loadHistory,
+  exportHistory,
+  clearHistory,
 }: {
   view: UsageView;
   usageEnabled: boolean;
@@ -821,8 +906,11 @@ function DashboardContent({
   selectedProduct: ProductSource;
   onSelectedProductChange: (product: ProductSource) => void;
   claudeEnabled: boolean;
+  loadHistory: (range: HistoryRange, windowId: string) => Promise<UsageHistorySeries>;
+  exportHistory: (range: HistoryRange, windowId: string) => Promise<boolean>;
+  clearHistory: () => Promise<void>;
 }) {
-  const [activeTab, setActiveTab] = useState<"usage" | "tasks">("usage");
+  const [activeTab, setActiveTab] = useState<"usage" | "tasks" | "history">("usage");
   const selectedTasks = tasks.tasks.filter((task) => (task.product ?? "codex") === selectedProduct);
   const visibleActive = selectedTasks.filter((task) => isTaskActive(task.status));
   const selectedJustCompleted = selectedTasks.find(
@@ -836,6 +924,9 @@ function DashboardContent({
     )
     .slice(0, 5);
   const effectiveProduct = selectedProduct;
+  useEffect(() => {
+    if (selectedProduct === "claude" && activeTab === "history") setActiveTab("usage");
+  }, [activeTab, selectedProduct]);
   return (
     <div className="dashboard-content">
       <nav className="product-switcher" aria-label={t("productSource")}>
@@ -869,6 +960,16 @@ function DashboardContent({
           {t("tasksTab")}
           {visibleActive.length > 0 && <span className="task-count">{visibleActive.length}</span>}
         </button>
+        {selectedProduct === "codex" && (
+          <button
+            className={activeTab === "history" ? "active" : ""}
+            type="button"
+            aria-selected={activeTab === "history"}
+            onClick={() => setActiveTab("history")}
+          >
+            {t("historyTab")}
+          </button>
+        )}
       </nav>
       {activeTab === "usage" ? (
         effectiveProduct === "claude" ? (
@@ -888,7 +989,7 @@ function DashboardContent({
             onResetsExpandedChange={onResetsExpandedChange}
           />
         )
-      ) : (
+      ) : activeTab === "tasks" ? (
         <TaskTabContent
           activeTasks={visibleActive}
           fallbackTask={selectedJustCompleted}
@@ -898,6 +999,17 @@ function DashboardContent({
           t={t}
           onOpenTask={onOpenTask}
         />
+      ) : view.status === "ready" ? (
+        <HistoryPanel
+          windows={view.snapshot.windows}
+          locale={locale}
+          refreshKey={view.snapshot.queriedAt}
+          loadHistory={loadHistory}
+          exportHistory={exportHistory}
+          clearHistory={clearHistory}
+        />
+      ) : (
+        <div className="history-state">{t("historyUnavailable")}</div>
       )}
     </div>
   );

@@ -81,6 +81,39 @@ const defaults = {
     taskSource: "local_claude_code_sessions" as const,
     usageStatus: "unavailable" as const,
   }),
+  loadHistory: vi.fn().mockResolvedValue({
+    range: "seven_days" as const,
+    windowId: "five_hour",
+    sampleCount: 3,
+    currentRemaining: 58,
+    minimumRemaining: 41,
+    maximumRemaining: 83,
+    points: [
+      { queriedAt: Date.now() - 120_000, remainingPercent: 83 },
+      { queriedAt: Date.now() - 60_000, remainingPercent: 66 },
+      { queriedAt: Date.now(), remainingPercent: 58 },
+    ],
+  }),
+  loadDiagnosticReport: vi.fn().mockResolvedValue({
+    appVersion: "1.2.6",
+    os: "macos",
+    credential: { status: "available", source: "auth_file" },
+    usageStatus: "ready",
+    refreshSettings: {
+      intervalMinutes: 5,
+      usageEnabled: true,
+      trayWindow: "five_hour" as const,
+      notifySeventy: false,
+      notifyNinety: true,
+      notifyHundred: true,
+      notifyReset: false,
+      claudeEnabled: false,
+      defaultProduct: "codex" as const,
+      notifyClaudeWaiting: true,
+      notifyClaudeCompleted: true,
+      notifyClaudeFailed: true,
+    },
+  }),
 };
 
 afterEach(() => {
@@ -89,6 +122,50 @@ afterEach(() => {
 });
 
 describe("App", () => {
+  it("shows a redacted diagnostic summary from settings", async () => {
+    const loadDiagnosticReport = vi.fn().mockResolvedValue({
+      appVersion: "1.2.6",
+      os: "macos",
+      credential: { status: "available", source: "auth_file" },
+      usageStatus: "ready",
+      refreshSettings: await defaults.loadSettings(),
+    });
+    render(<App {...defaults} loadDiagnosticReport={loadDiagnosticReport} />);
+
+    await screen.findAllByRole("progressbar");
+    fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
+    fireEvent.click(screen.getByRole("button", { name: /诊断信息|Diagnostics/ }));
+
+    expect(await screen.findByText("available")).toBeInTheDocument();
+    expect(screen.getByText("ready")).toBeInTheDocument();
+    expect(screen.getByText(/不包含 Access Token|contains no access token/)).toBeInTheDocument();
+  });
+
+  it("shows locally stored quota history without uploading it", async () => {
+    const loadHistory = vi.fn().mockResolvedValue({
+      range: "seven_days" as const,
+      windowId: "five_hour",
+      sampleCount: 3,
+      currentRemaining: 58,
+      minimumRemaining: 41,
+      maximumRemaining: 83,
+      points: [
+        { queriedAt: Date.now() - 120_000, remainingPercent: 83 },
+        { queriedAt: Date.now() - 60_000, remainingPercent: 66 },
+        { queriedAt: Date.now(), remainingPercent: 58 },
+      ],
+    });
+    render(<App {...defaults} loadHistory={loadHistory} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /趋势|Trends/ }));
+
+    expect(
+      await screen.findByRole("img", { name: /3 个原始采样点|3 original samples/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/基于 3 个本地采样点|Based on 3 local samples/)).toBeInTheDocument();
+    expect(loadHistory).toHaveBeenCalledWith("seven_days", "five_hour");
+  });
+
   it("hides the detailed widget while leaving the status bar process running", async () => {
     const hideWindow = vi.fn().mockResolvedValue(undefined);
     render(<App {...defaults} hideWindow={hideWindow} />);
@@ -673,7 +750,7 @@ describe("App", () => {
         expect.objectContaining({ trayWindow: "five_hour" }),
       ),
     );
-    expect(screen.queryByText(/诊断报告|Diagnostics/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /诊断信息|Diagnostics/ })).toBeInTheDocument();
     expect(screen.getByText(/Token用量 v1\.1\.0|Token Usage v1\.1\.0/)).toBeInTheDocument();
     expect(screen.getByText(/Eric Zhang/)).toBeInTheDocument();
   });

@@ -58,6 +58,7 @@ The app detects whether the official account is using a subscription or API mode
 - Remaining quota shown as 100% when full and 0% when exhausted
 - Automatic subscription/API mode detection; Credits are shown only in API mode when available
 - Usage-limit reset opportunities with a collapsed-by-default details section
+- Local usage trends for the last 24 hours, 7 days, and 30 days
 - Choose the 5-hour or 7-day window in the system tray or menu bar
 - Detailed and compact widgets with quick switching from the widget or tray
 - Manual refresh, configurable refresh interval, and quota alerts
@@ -69,6 +70,7 @@ The app detects whether the official account is using a subscription or API mode
 - Windows 11 Mica, Windows 10 Acrylic, and a readable solid-color fallback
 - Automatic light/dark contrast and basic Windows high-contrast support
 - Simplified Chinese and English interface
+- View and export redacted diagnostics without credentials or conversation content
 
 ## Preview
 

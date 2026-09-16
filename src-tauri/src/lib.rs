@@ -1,6 +1,7 @@
 mod claude;
 mod credentials;
 mod error;
+mod history;
 mod model;
 mod refresh;
 mod tasks;
@@ -59,6 +60,48 @@ fn credential_status() -> CredentialReport {
 #[tauri::command]
 fn account_mode() -> AccountModeReport {
     credentials::inspect_account_mode()
+}
+
+#[tauri::command]
+fn get_usage_history(
+    app: tauri::AppHandle,
+    range: history::HistoryRange,
+    window_id: String,
+) -> Result<history::UsageHistorySeries, UsageErrorPayload> {
+    if window_id.is_empty()
+        || window_id.len() > 64
+        || !window_id
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_')
+    {
+        return Err(UsageErrorPayload::from(error::UsageError::InvalidSettings));
+    }
+    history::read_series(&app, range, &window_id).map_err(UsageErrorPayload::from)
+}
+
+#[tauri::command]
+fn export_usage_history_to_path(
+    app: tauri::AppHandle,
+    range: history::HistoryRange,
+    window_id: String,
+    path: String,
+) -> Result<(), UsageErrorPayload> {
+    if window_id.is_empty()
+        || window_id.len() > 64
+        || !window_id
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_')
+    {
+        return Err(UsageErrorPayload::from(error::UsageError::InvalidSettings));
+    }
+    let csv = history::export_csv(&app, range, &window_id).map_err(UsageErrorPayload::from)?;
+    std::fs::write(path, csv)
+        .map_err(|_| UsageErrorPayload::from(error::UsageError::SettingsUnavailable))
+}
+
+#[tauri::command]
+fn clear_usage_history(app: tauri::AppHandle) -> Result<(), UsageErrorPayload> {
+    history::clear(&app).map_err(UsageErrorPayload::from)
 }
 
 #[tauri::command]
@@ -250,6 +293,7 @@ pub fn run() {
         .build();
     tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_autostart::Builder::new()
                 .app_name("Token用量")
@@ -287,6 +331,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             credential_status,
             account_mode,
+            get_usage_history,
+            export_usage_history_to_path,
+            clear_usage_history,
             claude_environment,
             get_tasks,
             open_task,
