@@ -1,6 +1,7 @@
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
 #import <dispatch/dispatch.h>
+#import <math.h>
 #import <objc/runtime.h>
 
 static const void *TokenUsageGlassKey = &TokenUsageGlassKey;
@@ -97,17 +98,11 @@ bool token_usage_apply_liquid_glass(void *view_pointer,
   return applied;
 }
 
-static bool token_usage_appearance_is_dark(NSAppearance *appearance) {
-  if (appearance == nil) {
-    return false;
-  }
-  NSAppearanceName match = [appearance
+static bool token_usage_appearance_is_dark(NSWindow *window) {
+  NSAppearanceName match = [window.effectiveAppearance
       bestMatchFromAppearancesWithNames:@[ NSAppearanceNameAqua,
-                                           NSAppearanceNameDarkAqua,
-                                           NSAppearanceNameVibrantLight,
-                                           NSAppearanceNameVibrantDark ]];
-  return [match isEqualToString:NSAppearanceNameDarkAqua] ||
-         [match isEqualToString:NSAppearanceNameVibrantDark];
+                                           NSAppearanceNameDarkAqua ]];
+  return [match isEqualToString:NSAppearanceNameDarkAqua];
 }
 
 static bool token_usage_backdrop_is_dark_impl(void *view_pointer) {
@@ -122,17 +117,104 @@ static bool token_usage_backdrop_is_dark_impl(void *view_pointer) {
       return false;
     }
 
-    TokenUsageGlassEffectView *glass =
-        objc_getAssociatedObject(window, TokenUsageGlassKey);
-
-    // Liquid Glass communicates its adaptive local appearance through the
-    // content-view hierarchy. This is the supported, permission-free signal
-    // for matching foreground colors to the material's current appearance.
-    NSAppearance *appearance = glass.contentView.effectiveAppearance;
-    if (appearance == nil) {
-      appearance = glass.effectiveAppearance ?: content.effectiveAppearance;
+    NSScreen *screen = window.screen ?: NSScreen.mainScreen;
+    NSURL *wallpaper_url = screen == nil
+                               ? nil
+                               : [[NSWorkspace sharedWorkspace]
+                                     desktopImageURLForScreen:screen];
+    static NSURL *cached_wallpaper_url = nil;
+    static NSImage *cached_wallpaper = nil;
+    if (wallpaper_url != nil && ![wallpaper_url isEqual:cached_wallpaper_url]) {
+      cached_wallpaper_url = wallpaper_url;
+      cached_wallpaper =
+          [[NSImage alloc] initWithContentsOfURL:cached_wallpaper_url];
     }
-    return token_usage_appearance_is_dark(appearance);
+    NSImage *wallpaper = wallpaper_url == nil ? nil : cached_wallpaper;
+    if (screen == nil || wallpaper == nil || wallpaper.size.width <= 0.0 ||
+        wallpaper.size.height <= 0.0) {
+      return token_usage_appearance_is_dark(window);
+    }
+
+    // macOS normally displays desktop pictures using aspect fill. Map the
+    // widget's current screen position back into that visible image region so
+    // moving the widget also updates its foreground contrast.
+    NSRect screen_frame = screen.frame;
+    NSRect window_frame = window.frame;
+    CGFloat scale = MAX(NSWidth(screen_frame) / wallpaper.size.width,
+                        NSHeight(screen_frame) / wallpaper.size.height);
+    if (!isfinite(scale) || scale <= 0.0) {
+      return token_usage_appearance_is_dark(window);
+    }
+    NSSize displayed = NSMakeSize(wallpaper.size.width * scale,
+                                  wallpaper.size.height * scale);
+    CGFloat displayed_x = NSMinX(screen_frame) +
+                          (NSWidth(screen_frame) - displayed.width) / 2.0;
+    CGFloat displayed_y = NSMinY(screen_frame) +
+                          (NSHeight(screen_frame) - displayed.height) / 2.0;
+    CGFloat center_x = (NSMidX(window_frame) - displayed_x) / scale;
+    CGFloat center_y = (NSMidY(window_frame) - displayed_y) / scale;
+    CGFloat sample_width = MAX(NSWidth(window_frame) / scale, 1.0);
+    CGFloat sample_height = MAX(NSHeight(window_frame) / scale, 1.0);
+    NSRect source = NSMakeRect(center_x - sample_width / 2.0,
+                               center_y - sample_height / 2.0,
+                               sample_width, sample_height);
+    source = NSIntersectionRect(source,
+                                NSMakeRect(0.0, 0.0, wallpaper.size.width,
+                                           wallpaper.size.height));
+    if (NSIsEmptyRect(source)) {
+      return token_usage_appearance_is_dark(window);
+    }
+
+    const NSInteger pixels = 28;
+    NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc]
+        initWithBitmapDataPlanes:NULL
+                      pixelsWide:pixels
+                      pixelsHigh:pixels
+                   bitsPerSample:8
+                 samplesPerPixel:4
+                        hasAlpha:YES
+                        isPlanar:NO
+                  colorSpaceName:NSDeviceRGBColorSpace
+                     bytesPerRow:0
+                    bitsPerPixel:0];
+    NSGraphicsContext *context =
+        [NSGraphicsContext graphicsContextWithBitmapImageRep:bitmap];
+    if (bitmap == nil || context == nil) {
+      return token_usage_appearance_is_dark(window);
+    }
+
+    [NSGraphicsContext saveGraphicsState];
+    [NSGraphicsContext setCurrentContext:context];
+    context.imageInterpolation = NSImageInterpolationHigh;
+    [wallpaper drawInRect:NSMakeRect(0.0, 0.0, pixels, pixels)
+                 fromRect:source
+                operation:NSCompositingOperationCopy
+                 fraction:1.0
+           respectFlipped:NO
+                    hints:nil];
+    [context flushGraphics];
+    [NSGraphicsContext restoreGraphicsState];
+
+    NSColorSpace *sRGB = NSColorSpace.sRGBColorSpace;
+    double total_luminance = 0.0;
+    NSUInteger sampled = 0;
+    for (NSInteger y = 0; y < pixels; y++) {
+      for (NSInteger x = 0; x < pixels; x++) {
+        NSColor *color = [[bitmap colorAtX:x y:y] colorUsingColorSpace:sRGB];
+        if (color == nil || color.alphaComponent <= 0.01) {
+          continue;
+        }
+        total_luminance += 0.2126 * color.redComponent +
+                           0.7152 * color.greenComponent +
+                           0.0722 * color.blueComponent;
+        sampled++;
+      }
+    }
+    if (sampled == 0) {
+      return token_usage_appearance_is_dark(window);
+    }
+
+    return total_luminance / sampled < 0.50;
   }
 }
 

@@ -61,7 +61,7 @@ const defaultWindowPreferences: WindowPreferences = {
   locked: false,
   clickThrough: false,
   showDockIcon: false,
-  glassLevel: 1,
+  glassLevel: 0.5,
 };
 
 const defaultRefreshSettings: RefreshSettings = {

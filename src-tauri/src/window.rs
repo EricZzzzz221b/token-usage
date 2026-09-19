@@ -26,7 +26,7 @@ pub struct WindowPreferences {
 }
 
 fn default_glass_level() -> f64 {
-    1.0
+    0.5
 }
 
 impl Default for WindowPreferences {
@@ -269,6 +269,6 @@ mod tests {
             r#"{"mode":"detailed","alwaysOnTop":true,"locked":false,"clickThrough":false,"opacity":0.8,"glassStrength":"rich"}"#,
         )
         .expect("deserialize legacy preferences");
-        assert_eq!(decoded.glass_level, 1.0);
+        assert_eq!(decoded.glass_level, 0.5);
     }
 }
