@@ -10,8 +10,8 @@
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="最新版本"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.6"><img src="https://img.shields.io/badge/macOS-v1.2.6-111111?logo=apple" alt="macOS v1.2.6"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.6"><img src="https://img.shields.io/badge/Windows-v1.2.6-0078D4?logo=windows11" alt="Windows v1.2.6"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.7"><img src="https://img.shields.io/badge/macOS-v1.2.7-111111?logo=apple" alt="macOS v1.2.7"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.7"><img src="https://img.shields.io/badge/Windows-v1.2.7-0078D4?logo=windows11" alt="Windows v1.2.7"></a>
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 
 Token用量把 Codex 最常被打断查看的两件事放进一个小浮窗：**额度还有多少，以及正在运行的任务有没有完成**。你可以切到浏览器、设计软件或其他项目继续工作，通过状态栏就能看到任务处于思考、执行还是等待操作；任务完成后还会收到系统通知，并可从最近完成列表一键返回对应的 Codex 会话。
 
-v1.2.6 新增隐藏浮窗功能：隐藏后仍保留 macOS 状态栏或 Windows 系统托盘，后台用量刷新、任务监控与通知继续运行。Claude 集成仍支持在 Codex 与 Claude 之间切换，并只读扫描本机 Claude Code 已生成的会话事件。Anthropic 当前没有向第三方桌面工具提供可安全读取的个人订阅剩余额度 API，因此 Claude 页面会明确显示额度不可用，不会用本地 token 估算冒充官方百分比。
+v1.2.7 新增本地用量趋势页，可查看 24 小时、7 天和 30 天的额度变化、导出 CSV，并改进 macOS 液态玻璃背景下的对比度。隐藏浮窗功能仍可在 macOS 状态栏或 Windows 系统托盘保持运行。Claude 集成仍支持在 Codex 与 Claude 之间切换，并只读扫描本机 Claude Code 已生成的会话事件。Anthropic 当前没有向第三方桌面工具提供可安全读取的个人订阅剩余额度 API，因此 Claude 页面会明确显示额度不可用，不会用本地 token 估算冒充官方百分比。
 
 应用会自动识别当前官方账号的使用模式。订阅账号显示套餐和 5 小时、7 天用量窗口；API 模式则按官方返回结果展示 Credits。所有凭据、用量和任务判断都在本机处理，不需要把 Access Token 或会话内容交给第三方服务。
 
@@ -94,25 +94,25 @@ v1.2.6 新增隐藏浮窗功能：隐藏后仍保留 macOS 状态栏或 Windows 
 
 | 平台                             | 状态   | 版本与下载                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS 13+ Apple Silicon          | 可下载 | [v1.2.6](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.6) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.6/TokenUsage_1.2.6_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.6/SHA256SUMS-1.2.6.txt)                                                                                                                                                                     |
-| Windows 11 / Windows 10 22H2 x64 | 可下载 | [v1.2.6](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.6) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.6/TokenUsage_Windows_1.2.6_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.6/TokenUsage_Windows_1.2.6_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.6/SHA256SUMS-Windows-1.2.6.txt) |
+| macOS 13+ Apple Silicon          | 可下载 | [v1.2.7](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.7) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.7/TokenUsage_1.2.7_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.7/SHA256SUMS-1.2.7.txt)                                                                                                                                                                     |
+| Windows 11 / Windows 10 22H2 x64 | 可下载 | [v1.2.7](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.7) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.7/TokenUsage_Windows_1.2.7_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.7/TokenUsage_Windows_1.2.7_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.7/SHA256SUMS-Windows-1.2.7.txt) |
 
-### macOS v1.2.6
+### macOS v1.2.7
 
-下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.6/TokenUsage_1.2.6_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。Claude 集成默认关闭，可在设置中启用；它只读取 `~/.claude/projects` 下 Claude Code 已生成的本地 JSONL 事件。
+下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.7/TokenUsage_1.2.7_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。Claude 集成默认关闭，可在设置中启用；它只读取 `~/.claude/projects` 下 Claude Code 已生成的本地 JSONL 事件。
 
 安装前建议退出旧版；遇到任务状态或额度显示异常时，请在 [Issues](https://github.com/EricZzzzz221b/token-usage/issues) 中附上应用版本和复现步骤，但不要上传 `auth.json` 或完整 Codex 会话日志。
 
-### Windows v1.2.6
+### Windows v1.2.7
 
 Windows 目前仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与运行验证。
 
 1. 优先下载并运行 `.msi`，也可以使用 `-setup.exe`。
-2. 本版本没有商业代码签名证书。若 SmartScreen 显示警告，请先核对 [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.6/SHA256SUMS-Windows-1.2.6.txt)，再选择“更多信息”→“仍要运行”。哈希不一致时不要继续。
+2. 本版本没有商业代码签名证书。若 SmartScreen 显示警告，请先核对 [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.7/SHA256SUMS-Windows-1.2.7.txt)，再选择“更多信息”→“仍要运行”。哈希不一致时不要继续。
 3. 安装器内嵌 WebView2 Bootstrapper。系统缺少 Runtime 时会启动 Microsoft 安装流程，因此首次安装可能需要联网；Windows 10 22H2 和 Windows 11 通常已包含 WebView2。
 4. 使用 ChatGPT OAuth 登录 Codex CLI 或客户端。应用支持 `%USERPROFILE%\.codex\auth.json` 与 `CODEX_HOME\auth.json`。
 
-卸载：打开“设置”→“应用”→“已安装的应用”，找到“Token用量”并选择“卸载”。完整说明见 [Windows v1.2.6 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.6)。
+卸载：打开“设置”→“应用”→“已安装的应用”，找到“Token用量”并选择“卸载”。完整说明见 [Windows v1.2.7 Release](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.7)。
 
 ## 隐私
 
