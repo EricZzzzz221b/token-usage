@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { save } from "@tauri-apps/plugin-dialog";
 import { isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 
@@ -25,16 +26,15 @@ export async function exportDiagnosticReport(): Promise<boolean> {
 export const enableUsage = () => invoke<import("./usage").UsageView>("enable_usage");
 export type AccountMode = "subscription" | "api" | "other" | "signed_out";
 export const getAccountMode = () => invoke<{ mode: AccountMode }>("account_mode");
-export interface ClaudeEnvironment {
-  desktopInstalled: boolean;
-  desktopRunning: boolean;
-  codeAvailable: boolean;
-  taskSource: "local_claude_code_sessions";
-  usageStatus: "unavailable";
-}
-export const getClaudeEnvironment = () => invoke<ClaudeEnvironment>("claude_environment");
+export const syncSurfaceTone = (dark: boolean) => invoke<boolean>("sync_surface_tone", { dark });
+export const screenCaptureAllowed = () => invoke<boolean>("screen_capture_allowed");
+export const sampleBackdropLuminance = () => invoke<number>("sample_backdrop_luminance");
 
 export async function ensureNotificationPermission(): Promise<boolean> {
   if (await isPermissionGranted()) return true;
   return (await requestPermission()) === "granted";
+}
+
+export function confirmNative(message: string, title = "Token用量"): Promise<boolean> {
+  return ask(message, { title, kind: "warning" });
 }

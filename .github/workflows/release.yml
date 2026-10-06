@@ -1,27 +1,47 @@
-name: Release macOS
+name: Release macOS stable
 
+# Explicit dispatch only. This workflow never creates or pushes tags.
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag, for example v1.2.7
+        description: Existing new stable tag, for example v1.2.8
         required: true
-        default: v1.2.7
+      mode:
+        description: GitHub-only (no Apple certificate), or Apple-notarized
+        type: choice
+        options: [github-ad-hoc, notarized]
+        default: github-ad-hoc
+        required: true
+      acknowledge_unnotarized:
+        description: GitHub ad-hoc may be blocked by macOS and require permission approval
+        type: boolean
+        default: false
+      confirm:
+        description: Publish signed updater artifacts and advance macOS stable (type yes)
+        required: true
 
 permissions:
   contents: write
 
+concurrency:
+  group: macos-stable-release
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: inputs.confirm == 'yes'
+    environment: macos-stable
     runs-on: macos-14
     env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      MACOS_RELEASE_MODE: ${{ inputs.mode }}
+      ALLOW_UNNOTARIZED_RELEASE: ${{ inputs.acknowledge_unnotarized && 'yes' || 'no' }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
       - uses: actions/setup-node@v6
         with:
           node-version: 22
@@ -29,40 +49,54 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: aarch64-apple-darwin
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: ./src-tauri -> target
       - run: npm ci
-      - run: npm run check
-      - name: Verify tag matches app version
+      - name: Validate mode acknowledgement, stable version and existing tag
         run: |
-          VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          node --input-type=module -e 'import {releaseMode,requireModeAcknowledgement} from "./scripts/stable-release.mjs"; requireModeAcknowledgement(releaseMode());'
+          VERSION="$(node scripts/stable-release.mjs version)"
           test "$RELEASE_TAG" = "v$VERSION"
-      - name: Build signed app and DMG
+          git rev-parse --verify "refs/tags/$RELEASE_TAG"
+      - name: Build explicit GitHub ad-hoc artifacts (no Apple credentials)
+        if: inputs.mode == 'github-ad-hoc'
+        env:
+          TOKEN_USAGE_UPDATER_PUBLIC_KEY: ${{ vars.TOKEN_USAGE_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./scripts/build-macos-stable.sh
+      - name: Build Apple-notarized artifacts (no ad-hoc fallback)
+        if: inputs.mode == 'notarized'
+        env:
+          TOKEN_USAGE_UPDATER_PUBLIC_KEY: ${{ vars.TOKEN_USAGE_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        shell: bash
         run: |
-          npm run tauri -- build --bundles app
-          ./scripts/build-dmg.sh
-      - name: Generate checksum
+          set -euo pipefail
+          test -n "$APPLE_CERTIFICATE"
+          test -n "$APPLE_CERTIFICATE_PASSWORD"
+          test -n "$APPLE_API_PRIVATE_KEY"
+          KEY_DIR="$(mktemp -d)"
+          trap 'rm -rf "$KEY_DIR"' EXIT
+          umask 077
+          export APPLE_API_KEY_PATH="$KEY_DIR/notary.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY" > "$APPLE_API_KEY_PATH"
+          unset APPLE_API_PRIVATE_KEY
+          ./scripts/build-macos-stable.sh
+      - name: Upload immutable assets, verify downloads, advance stable last
+        env:
+          CONFIRM_STABLE_PUBLISH: "yes"
+          TOKEN_USAGE_UPDATER_PUBLIC_KEY: ${{ vars.TOKEN_USAGE_UPDATER_PUBLIC_KEY }}
         run: |
-          VERSION="${RELEASE_TAG#v}"
-          cd outputs
-          shasum -a 256 "TokenUsage_${VERSION}_arm64.dmg" > "SHA256SUMS-${VERSION}.txt"
-      - name: Create or update GitHub release
-        run: |
-          VERSION="${RELEASE_TAG#v}"
-          DMG="outputs/TokenUsage_${VERSION}_arm64.dmg"
-          CHECKSUM="outputs/SHA256SUMS-${VERSION}.txt"
-          NOTES="docs/release-notes-${RELEASE_TAG}.md"
-          if [ ! -f "$NOTES" ]; then
-            NOTES="outputs/TokenUsage_${VERSION}_ReleaseNotes.md"
-          fi
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "$DMG" "$CHECKSUM" --clobber
-            gh release edit "$RELEASE_TAG" --title "Token用量 $RELEASE_TAG" --notes-file "$NOTES"
-          elif [[ "$RELEASE_TAG" == *-* ]]; then
-            gh release create "$RELEASE_TAG" "$DMG" "$CHECKSUM" \
-              --title "Token用量 $RELEASE_TAG" --notes-file "$NOTES" --prerelease
-          else
-            gh release create "$RELEASE_TAG" "$DMG" "$CHECKSUM" \
-              --title "Token用量 $RELEASE_TAG" --notes-file "$NOTES"
-          fi
+          VERSION="$(node scripts/stable-release.mjs version)"
+          node scripts/publish-macos-stable.mjs "outputs/stable/$VERSION"

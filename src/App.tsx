@@ -1,14 +1,9 @@
+import { onUpdateSettingsRequested } from "./updates";
+import { UpdatePanel } from "./UpdatePanel";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNativeGlass, useSurfaceTone } from "./surface";
 import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
-import HistoryPanel from "./HistoryPanel";
-import {
-  clearUsageHistory,
-  exportUsageHistory,
-  getUsageHistory,
-  type HistoryRange,
-  type UsageHistorySeries,
-} from "./history";
 import {
   getRefreshSettings,
   getUsage,
@@ -25,12 +20,13 @@ import {
   ensureNotificationPermission,
   getAccountMode,
   getAutostart,
-  getClaudeEnvironment,
   getDiagnosticReport,
   exportDiagnosticReport,
+  sampleBackdropLuminance,
+  screenCaptureAllowed,
+  syncSurfaceTone,
   setAutostart,
   type AccountMode,
-  type ClaudeEnvironment,
   type DiagnosticReport,
 } from "./system";
 import {
@@ -38,12 +34,10 @@ import {
   openTask,
   onTasksUpdated,
   type CodexTask,
-  type ProductSource,
   type TaskSnapshot,
   type TaskStatus,
 } from "./tasks";
 import {
-  getBackdropTone,
   getWindowPreferences,
   hideWindowToTray,
   onWindowModeChanged,
@@ -51,7 +45,6 @@ import {
   resizeWindowForView,
   setWindowPreferences,
   startWindowDrag,
-  type BackdropTone,
   type WindowPreferences,
 } from "./window";
 
@@ -72,11 +65,6 @@ const defaultRefreshSettings: RefreshSettings = {
   notifyNinety: true,
   notifyHundred: true,
   notifyReset: false,
-  claudeEnabled: false,
-  defaultProduct: "codex",
-  notifyClaudeWaiting: true,
-  notifyClaudeCompleted: true,
-  notifyClaudeFailed: true,
 };
 
 const emptyTaskSnapshot = (): TaskSnapshot => ({ tasks: [], queriedAt: Date.now() });
@@ -128,18 +116,16 @@ interface AppProps {
   loadAppVersion?: () => Promise<string>;
   authorizeUsage?: () => Promise<UsageView>;
   resizeView?: (view: "compact" | "detailed" | "settings") => Promise<void>;
-  detectBackdrop?: () => Promise<BackdropTone>;
-  backdropPollIntervalMs?: number;
   loadTasks?: () => Promise<TaskSnapshot>;
   subscribeTasks?: (handler: (snapshot: TaskSnapshot) => void) => Promise<() => void>;
   loadAccountMode?: () => Promise<{ mode: AccountMode }>;
-  loadClaudeEnvironment?: () => Promise<ClaudeEnvironment>;
-  openTask?: (product: ProductSource, sessionId: string) => Promise<void>;
-  loadHistory?: (range: HistoryRange, windowId: string) => Promise<UsageHistorySeries>;
-  exportHistory?: (range: HistoryRange, windowId: string) => Promise<boolean>;
-  clearHistory?: () => Promise<void>;
+  openTask?: (sessionId: string) => Promise<void>;
   loadDiagnosticReport?: () => Promise<DiagnosticReport>;
   exportDiagnosticReport?: () => Promise<boolean>;
+  syncSurfaceTone?: (dark: boolean) => Promise<boolean>;
+  screenCaptureAllowed?: () => Promise<boolean>;
+  sampleBackdropLuminance?: () => Promise<number>;
+  backdropPollIntervalMs?: number;
 }
 
 function remainingPercent(usedPercent: number) {
@@ -192,18 +178,16 @@ export default function App({
   loadAppVersion = getVersion,
   authorizeUsage = enableUsage,
   resizeView = resizeWindowForView,
-  detectBackdrop = getBackdropTone,
-  backdropPollIntervalMs = 150,
   loadTasks = loadTasksSafely,
   subscribeTasks = subscribeTasksSafely,
   loadAccountMode = loadAccountModeSafely,
-  loadClaudeEnvironment = getClaudeEnvironment,
   openTask: openTaskSession = openTask,
-  loadHistory = getUsageHistory,
-  exportHistory = exportUsageHistory,
-  clearHistory = clearUsageHistory,
   loadDiagnosticReport = getDiagnosticReport,
   exportDiagnosticReport: saveDiagnosticReport = exportDiagnosticReport,
+  syncSurfaceTone: syncNativeTone = syncSurfaceTone,
+  screenCaptureAllowed: isScreenCaptureAllowed = screenCaptureAllowed,
+  sampleBackdropLuminance: readBackdropLuminance = sampleBackdropLuminance,
+  backdropPollIntervalMs = 300,
 }: AppProps) {
   const { t, i18n } = useTranslation();
   const [view, setView] = useState<UsageView>({ status: "loading" });
@@ -220,60 +204,21 @@ export default function App({
   const persistedSettingsRef = useRef(defaultRefreshSettings);
   const settingsSaveQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [saveError, setSaveError] = useState(false);
-  const [backdropTone, setBackdropTone] = useState<BackdropTone>("light");
   const [tasks, setTasks] = useState<TaskSnapshot>({ tasks: [], queriedAt: Date.now() });
   const [clock, setClock] = useState(Date.now());
   const [accountMode, setAccountMode] = useState<AccountMode>("signed_out");
-  const [claudeEnvironment, setClaudeEnvironment] = useState<ClaudeEnvironment>();
-  const [selectedProduct, setSelectedProduct] = useState<ProductSource>("codex");
   // Keep this above the detailed/compact branches so changing views does not
   // recreate the disclosure and discard the user's choice.
   const [resetsExpanded, setResetsExpanded] = useState(false);
   const [diagnosticReport, setDiagnosticReport] = useState<DiagnosticReport>();
   const [diagnosticLoading, setDiagnosticLoading] = useState(false);
   const [diagnosticError, setDiagnosticError] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    let detecting = false;
-    let hasAppliedTone = false;
-    let lastCandidate: BackdropTone | undefined;
-    let matchingSamples = 0;
-    const detect = () => {
-      if (detecting || document.hidden) return;
-      detecting = true;
-      void detectBackdrop()
-        .then((next) => {
-          if (!active) return;
-          if (next === lastCandidate) matchingSamples += 1;
-          else {
-            lastCandidate = next;
-            matchingSamples = 1;
-          }
-          if (!hasAppliedTone) {
-            hasAppliedTone = true;
-            setBackdropTone(next);
-            return;
-          }
-          if (matchingSamples >= 2) setBackdropTone(next);
-        })
-        .catch(() => undefined)
-        .finally(() => {
-          detecting = false;
-        });
-    };
-    detect();
-    const timer = window.setInterval(detect, backdropPollIntervalMs);
-    const detectWhenVisible = () => {
-      if (!document.hidden) detect();
-    };
-    document.addEventListener("visibilitychange", detectWhenVisible);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", detectWhenVisible);
-    };
-  }, [backdropPollIntervalMs, detectBackdrop]);
+  const surfaceTone = useSurfaceTone(
+    isScreenCaptureAllowed,
+    readBackdropLuminance,
+    backdropPollIntervalMs,
+  );
+  const nativeGlass = useNativeGlass(surfaceTone, syncNativeTone);
 
   useEffect(() => {
     void loadUsage().then(setView);
@@ -281,14 +226,10 @@ export default function App({
       settingsRef.current = next;
       persistedSettingsRef.current = next;
       setSettings(next);
-      setSelectedProduct(next.defaultProduct === "claude" ? "claude" : "codex");
     });
     void loadAutostart().then(setAutostartValue);
     void loadAppVersion().then(setAppVersion);
     void loadAccountMode().then((report) => setAccountMode(report.mode));
-    void loadClaudeEnvironment()
-      .then(setClaudeEnvironment)
-      .catch(() => undefined);
     void loadWindowPreferences().then((next) => {
       preferencesRef.current = next;
       persistedPreferencesRef.current = next;
@@ -345,13 +286,27 @@ export default function App({
     loadWindowPreferences,
     loadTasks,
     loadAccountMode,
-    loadClaudeEnvironment,
     subscribe,
     subscribeSettings,
     subscribeWindowPreferences,
     subscribeWindowModeChanged,
     subscribeTasks,
   ]);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void onUpdateSettingsRequested(() => {
+      setScreen("settings");
+      void resizeView("settings");
+    })
+      .then((cleanup) => (active ? (unlisten = cleanup) : cleanup()))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [resizeView]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(Date.now()), 1000);
@@ -441,10 +396,9 @@ export default function App({
   );
 
   const compact = preferences.mode === "compact" && screen === "meter";
-  const textToneClass = `backdrop-${backdropTone}`;
   const platformClass = navigator.userAgent.includes("Windows") ? "platform-windows" : "";
   const readyWindows = view.status === "ready" ? view.snapshot.windows : [];
-  const selectedTasks = tasks.tasks.filter((task) => (task.product ?? "codex") === selectedProduct);
+  const selectedTasks = tasks.tasks;
   const activeTasks = selectedTasks.filter((task) => isTaskActive(task.status));
   const primaryTask = activeTasks[0];
   const recentCompletion = selectedTasks.find(
@@ -452,7 +406,6 @@ export default function App({
   );
   const displayTask = primaryTask ?? recentCompletion;
   const displayStatus: TaskStatus = displayTask?.status ?? "unknown";
-  const effectiveProduct = selectedProduct;
 
   const openSettings = () => {
     setScreen("settings");
@@ -478,14 +431,18 @@ export default function App({
 
   if (compact) {
     return (
-      <main className={`app-shell compact-shell ${textToneClass} ${platformClass}`}>
+      <main
+        className={`app-shell compact-shell ${platformClass}`}
+        data-surface-tone={surfaceTone}
+        data-native-glass={nativeGlass}
+      >
         <section
           className={`liquid-panel compact-panel status-${displayStatus}`}
           onMouseDown={drag}
         >
           <div className="compact-primary" role="status" aria-live="polite">
             <span className="product-mark" aria-hidden="true">
-              {(displayTask?.product ?? selectedProduct) === "claude" ? "C" : "⌘"}
+              ⌘
             </span>
             <div className="compact-status-copy">
               <strong>{t(`taskStatus.${displayStatus}`)}</strong>
@@ -499,9 +456,7 @@ export default function App({
           {activeTasks.length > 1 && (
             <span className="compact-task-count">+{activeTasks.length - 1}</span>
           )}
-          {effectiveProduct === "claude" ? (
-            <span className="compact-quota">{t("claudeUsageUnavailableShort")}</span>
-          ) : !settings.usageEnabled ? (
+          {!settings.usageEnabled ? (
             <button
               className="compact-quota-button"
               type="button"
@@ -525,6 +480,7 @@ export default function App({
             <span className="compact-quota">{`${windowShortLabel(readyWindows[0].id)} ${remainingPercent(readyWindows[0].usedPercent)}%`}</span>
           ) : null}
           <div className="compact-actions" onMouseDown={(event) => event.stopPropagation()}>
+            <UpdatePanel settings={false} compact onOpenSettings={openSettings} />
             <button
               className="compact-action compact-hide-action"
               type="button"
@@ -553,19 +509,15 @@ export default function App({
 
   return (
     <main
-      className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"} ${textToneClass} ${platformClass}`}
+      className={`app-shell ${screen === "settings" ? "settings-shell" : "detail-shell"} ${platformClass}`}
+      data-surface-tone={surfaceTone}
+      data-native-glass={nativeGlass}
     >
       <section className="liquid-panel">
         <header className="titlebar" onMouseDown={drag}>
           <div className="title-identity">
-            <h1>
-              {screen === "settings"
-                ? t("settingsTitle")
-                : effectiveProduct === "claude"
-                  ? t("claudeMonitorTitle")
-                  : t("meterTitle")}
-            </h1>
-            {screen !== "settings" && effectiveProduct === "codex" && (
+            <h1>{screen === "settings" ? t("settingsTitle") : t("meterTitle")}</h1>
+            {screen !== "settings" && (
               <span className={`account-mode mode-${accountMode}`}>
                 {accountMode === "subscription" && view.status === "ready" && view.snapshot.planType
                   ? t("subscriptionMode", { plan: view.snapshot.planType.toUpperCase() })
@@ -643,55 +595,6 @@ export default function App({
                 onChange={(checked) => void updatePreferences({ clickThrough: checked })}
               />
             </SettingsGroup>
-            <SettingsGroup title={t("aiProductsGroup")}>
-              <ToggleRow
-                label={t("enableClaude")}
-                checked={settings.claudeEnabled}
-                onChange={(checked) => void updateSettings({ claudeEnabled: checked })}
-              />
-              <SelectRow
-                label={t("defaultProduct")}
-                value={settings.defaultProduct}
-                onChange={(value) => {
-                  const product = value as ProductSource;
-                  setSelectedProduct(product);
-                  void updateSettings({ defaultProduct: product });
-                }}
-                options={[
-                  ["codex", "Codex"],
-                  ["claude", "Claude"],
-                ]}
-              />
-              <div className="setting-row claude-environment-row">
-                <span>{t("claudeEnvironment")}</span>
-                <span className="row-value">
-                  {claudeEnvironment?.desktopInstalled
-                    ? claudeEnvironment.codeAvailable
-                      ? t("claudeEnvironmentReady")
-                      : t("claudeDesktopOnly")
-                    : t("claudeNotInstalled")}
-                </span>
-              </div>
-            </SettingsGroup>
-            {settings.claudeEnabled && (
-              <SettingsGroup title={t("claudeNotificationsGroup")}>
-                <ToggleRow
-                  label={t("notifyClaudeWaiting")}
-                  checked={settings.notifyClaudeWaiting}
-                  onChange={(checked) => void updateSettings({ notifyClaudeWaiting: checked })}
-                />
-                <ToggleRow
-                  label={t("notifyClaudeCompleted")}
-                  checked={settings.notifyClaudeCompleted}
-                  onChange={(checked) => void updateSettings({ notifyClaudeCompleted: checked })}
-                />
-                <ToggleRow
-                  label={t("notifyClaudeFailed")}
-                  checked={settings.notifyClaudeFailed}
-                  onChange={(checked) => void updateSettings({ notifyClaudeFailed: checked })}
-                />
-              </SettingsGroup>
-            )}
             <SettingsGroup title={t("dataGroup")}>
               <SelectRow
                 label={t("trayWindow")}
@@ -826,6 +729,7 @@ export default function App({
                 ) : null}
               </section>
             )}
+            <UpdatePanel settings />
             <div className="about-meta">
               <span>
                 {t("appName")} v{appVersion}
@@ -846,16 +750,11 @@ export default function App({
             t={t}
             accountMode={accountMode}
             onOpenTask={openTaskSession}
-            selectedProduct={selectedProduct}
-            onSelectedProductChange={setSelectedProduct}
-            claudeEnabled={settings.claudeEnabled}
             resetsExpanded={resetsExpanded}
             onResetsExpandedChange={setResetsExpanded}
-            loadHistory={loadHistory}
-            exportHistory={exportHistory}
-            clearHistory={clearHistory}
           />
         )}
+        {screen !== "settings" && <UpdatePanel settings={false} onOpenSettings={openSettings} />}
       </section>
     </main>
   );
@@ -883,12 +782,6 @@ function DashboardContent({
   resetsExpanded,
   onResetsExpandedChange,
   onOpenTask,
-  selectedProduct,
-  onSelectedProductChange,
-  claudeEnabled,
-  loadHistory,
-  exportHistory,
-  clearHistory,
 }: {
   view: UsageView;
   usageEnabled: boolean;
@@ -902,16 +795,10 @@ function DashboardContent({
   accountMode: AccountMode;
   resetsExpanded: boolean;
   onResetsExpandedChange: (expanded: boolean) => void;
-  onOpenTask: (product: ProductSource, sessionId: string) => Promise<void>;
-  selectedProduct: ProductSource;
-  onSelectedProductChange: (product: ProductSource) => void;
-  claudeEnabled: boolean;
-  loadHistory: (range: HistoryRange, windowId: string) => Promise<UsageHistorySeries>;
-  exportHistory: (range: HistoryRange, windowId: string) => Promise<boolean>;
-  clearHistory: () => Promise<void>;
+  onOpenTask: (sessionId: string) => Promise<void>;
 }) {
-  const [activeTab, setActiveTab] = useState<"usage" | "tasks" | "history">("usage");
-  const selectedTasks = tasks.tasks.filter((task) => (task.product ?? "codex") === selectedProduct);
+  const [activeTab, setActiveTab] = useState<"usage" | "tasks">("usage");
+  const selectedTasks = tasks.tasks;
   const visibleActive = selectedTasks.filter((task) => isTaskActive(task.status));
   const selectedJustCompleted = selectedTasks.find(
     (task) => task.status === "completed" && now - (task.completedAt ?? task.updatedAt) < 15_000,
@@ -923,24 +810,8 @@ function DashboardContent({
         (right.completedAt ?? right.updatedAt) - (left.completedAt ?? left.updatedAt),
     )
     .slice(0, 5);
-  const effectiveProduct = selectedProduct;
-  useEffect(() => {
-    if (selectedProduct === "claude" && activeTab === "history") setActiveTab("usage");
-  }, [activeTab, selectedProduct]);
   return (
     <div className="dashboard-content">
-      <nav className="product-switcher" aria-label={t("productSource")}>
-        {(["codex", "claude"] as const).map((product) => (
-          <button
-            className={selectedProduct === product ? "active" : ""}
-            type="button"
-            key={product}
-            onClick={() => onSelectedProductChange(product)}
-          >
-            {product === "codex" ? "Codex" : "Claude"}
-          </button>
-        ))}
-      </nav>
       <nav className="meter-tabs" aria-label={t("overviewTabs")}>
         <button
           className={activeTab === "usage" ? "active" : ""}
@@ -960,35 +831,21 @@ function DashboardContent({
           {t("tasksTab")}
           {visibleActive.length > 0 && <span className="task-count">{visibleActive.length}</span>}
         </button>
-        {selectedProduct === "codex" && (
-          <button
-            className={activeTab === "history" ? "active" : ""}
-            type="button"
-            aria-selected={activeTab === "history"}
-            onClick={() => setActiveTab("history")}
-          >
-            {t("historyTab")}
-          </button>
-        )}
       </nav>
       {activeTab === "usage" ? (
-        effectiveProduct === "claude" ? (
-          <ClaudeUsageUnavailable t={t} claudeEnabled={claudeEnabled} />
-        ) : (
-          <MeterContent
-            view={view}
-            usageEnabled={usageEnabled}
-            stale={view.status === "ready" && view.stale}
-            intervalMinutes={intervalMinutes}
-            locale={locale}
-            onRefresh={onRefresh}
-            onAuthorize={onAuthorize}
-            t={t}
-            accountMode={accountMode}
-            resetsExpanded={resetsExpanded}
-            onResetsExpandedChange={onResetsExpandedChange}
-          />
-        )
+        <MeterContent
+          view={view}
+          usageEnabled={usageEnabled}
+          stale={view.status === "ready" && view.stale}
+          intervalMinutes={intervalMinutes}
+          locale={locale}
+          onRefresh={onRefresh}
+          onAuthorize={onAuthorize}
+          t={t}
+          accountMode={accountMode}
+          resetsExpanded={resetsExpanded}
+          onResetsExpandedChange={onResetsExpandedChange}
+        />
       ) : activeTab === "tasks" ? (
         <TaskTabContent
           activeTasks={visibleActive}
@@ -999,18 +856,7 @@ function DashboardContent({
           t={t}
           onOpenTask={onOpenTask}
         />
-      ) : view.status === "ready" ? (
-        <HistoryPanel
-          windows={view.snapshot.windows}
-          locale={locale}
-          refreshKey={view.snapshot.queriedAt}
-          loadHistory={loadHistory}
-          exportHistory={exportHistory}
-          clearHistory={clearHistory}
-        />
-      ) : (
-        <div className="history-state">{t("historyUnavailable")}</div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1030,7 +876,7 @@ function TaskTabContent({
   now: number;
   locale: string;
   t: ReturnType<typeof useTranslation>["t"];
-  onOpenTask: (product: ProductSource, sessionId: string) => Promise<void>;
+  onOpenTask: (sessionId: string) => Promise<void>;
 }) {
   return (
     <div className="task-tab-content">
@@ -1054,15 +900,10 @@ function TaskTabContent({
               disabled={!item.sessionId}
               aria-label={`${item.title} · ${t("openTask")}`}
               title={t("openTask")}
-              onClick={() =>
-                item.sessionId && void onOpenTask(item.product ?? "codex", item.sessionId)
-              }
+              onClick={() => item.sessionId && void onOpenTask(item.sessionId)}
             >
-              <span
-                className={`task-product product-${item.product ?? "codex"}`}
-                aria-hidden="true"
-              >
-                {item.product === "claude" ? "C" : "⌘"}
+              <span className="task-product" aria-hidden="true">
+                ⌘
               </span>
               <span className="recent-state">{t(`taskStatus.${item.status}`)}</span>
               <strong>{item.title}</strong>
@@ -1088,13 +929,13 @@ function StatusHero({
   task?: CodexTask;
   now: number;
   t: ReturnType<typeof useTranslation>["t"];
-  onOpenTask?: (product: ProductSource, sessionId: string) => Promise<void>;
+  onOpenTask?: (sessionId: string) => Promise<void>;
 }) {
   const status = task?.status ?? "unknown";
   const content = (
     <>
-      <span className={`task-product product-${task?.product ?? "codex"}`} aria-hidden="true">
-        {task?.product === "claude" ? "C" : "⌘"}
+      <span className="task-product" aria-hidden="true">
+        ⌘
       </span>
       <div className="status-hero-copy">
         <div className="status-line">
@@ -1113,7 +954,7 @@ function StatusHero({
         type="button"
         aria-label={`${task.title} · ${t("openTask")}`}
         title={t("openTask")}
-        onClick={() => void onOpenTask(task.product ?? "codex", task.sessionId!)}
+        onClick={() => void onOpenTask(task.sessionId!)}
       >
         {content}
       </button>
@@ -1123,31 +964,6 @@ function StatusHero({
     <section className={`status-hero status-${status}`} aria-live="polite">
       {content}
     </section>
-  );
-}
-
-function ClaudeUsageUnavailable({
-  t,
-  claudeEnabled,
-}: {
-  t: ReturnType<typeof useTranslation>["t"];
-  claudeEnabled: boolean;
-}) {
-  return (
-    <div className="state-card claude-usage-state">
-      <div className="claude-state-heading">
-        <span className="task-product product-claude" aria-hidden="true">
-          C
-        </span>
-        <div>
-          <strong>{t("claudeSharedUsage")}</strong>
-          <small>{t("claudeSharedUsageScope")}</small>
-        </div>
-        <span className="beta-badge">BETA</span>
-      </div>
-      <p>{claudeEnabled ? t("claudeUsageUnavailable") : t("claudeEnableHint")}</p>
-      <span className="data-confidence">{t("noEstimatedPercentage")}</span>
-    </div>
   );
 }
 

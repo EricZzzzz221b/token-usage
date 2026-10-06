@@ -46,7 +46,7 @@ jobs:
                 --notes-file "$notes"
             fi
 
-            gh release upload "$tag" "$dmg" --clobber
+            gh release upload "$tag" "$dmg"
           done
 
           gh release edit v1.1.3 --latest

@@ -19,12 +19,12 @@ macOS Keychain / ~/.codex/auth.json
     Menu Bar  Floating UI  Notifications
                  │
                  ▼
-           Local Snapshot Store
+           In-memory Last-good State
 ```
 
 任务状态中心从 `$CODEX_HOME/sessions`（默认 `~/.codex/sessions`）读取本机会话生命周期事件，标准化为运行中、完成和失败状态。前端只接收任务标题摘要、项目末级名称、状态和时间；原始会话内容不会复制到应用存储。扫描器每 2 秒增量刷新最近会话，并通过 Tauri 事件同步浮窗、菜单栏和完成通知。会话事件属于兼容层，未来可在稳定的 Codex Hooks/app-server 客户端可用时替换，UI 状态模型无需改变。
 
-应用采用 Tauri 2。Rust 负责凭据读取、网络请求、快照存储、调度和系统能力；React/TypeScript 负责菜单弹层、浮窗和设置界面。
+应用采用 Tauri 2。Rust 负责凭据读取、网络请求、内存快照、调度和系统能力；React/TypeScript 负责菜单弹层、浮窗和设置界面。
 
 ## 2. 模块边界
 
@@ -106,11 +106,19 @@ interface UsageWindow {
 
 负责自动刷新、手动刷新合并、睡眠恢复、网络恢复、超时和重试。调度器不持有长期明文凭据，每次查询按需读取。
 
-### SnapshotStore
+### 内存快照与本地设置
 
-只保存用量快照、更新时间、通知阈值状态和非敏感设置。MVP 虽不展示历史曲线，但从首版开始保存有限快照，为后续图表能力准备数据。
+用量快照、最后成功数据和通知去重状态仅保留在 `RefreshCoordinator` 内存中；退出后不恢复用量快照。不再提供历史曲线或 CSV 导出，也不再创建、追加、清理 `usage-history.jsonl`。升级时保留已有历史文件。
 
-历史文件采用 JSONL 追加写入，避免每次刷新都重写全部记录。每累计 256 次追加或文件超过 8 MiB 时执行压缩：删除超过 30 天、格式损坏和超出 8,640 条上限的记录。趋势查询最多向前端返回 180 个绘图点，并优先保留额度重置事件。
+设置仍使用现有 JSON 配置。反序列化忽略旧配置的产品来源和第三方通知字段；启动后始终显示 Codex。任务扫描继续只读访问 Codex 会话事件及现有标题来源。
+
+### 窗口主题与可选屏幕采样
+
+前端 `useSurfaceTone` 维护唯一的 `SurfaceTone = "light" | "dark"`，通过 App 根节点 `data-surface-tone` 统一驱动 compact、detailed、settings 的语义颜色。macOS 26/27 能力检测成功时使用单层标准 `NSGlassEffectView` 承载 WebView，前端仅加 6% 的轻微底色。原生层确认玻璃与主题同步后才启用轻薄表面；旧系统、原生初始化失败或辅助功能要求更高对比度时使用保护底色。
+
+没有屏幕录制权限时跟随系统主题，并监听系统浅色/深色变化。仅在 preflight 确认已有权限后读取浮窗背后的亮度标量；原生采样函数再次检查权限，不调用申请权限 API。采样图像只在内存中计算亮度，不写文件或上传。
+
+采样采用指数平滑（前值 72%、新值 28%）、0.42/0.58 明暗滞后阈值和至少 600ms 候选稳定时间。读操作串行执行；失败或权限撤销立即回退到系统主题，5 秒后才重试，窗口隐藏时暂停采样。系统主题不可用时安全默认浅色。原生 `glass.appearance` 与相同 `SurfaceTone` 同步，以免采样切换前景后玻璃仍保留系统的相反色调。WebView 保持系统外观，避免原生采样主题反过来改写 `matchMedia` 的系统主题回退。
 
 ## 3. 错误模型
 
@@ -191,3 +199,7 @@ pub enum UsageError {
 - Release 构建必须签名并 notarize
 - 发布物包含隐私说明和第三方许可证
 - 自动更新在签名与回滚流程验证完成后启用
+
+## 6. 独立应用更新服务
+
+macOS Apple Silicon stable 的 `UpdateService` 使用单一操作锁和独立 30 秒／12 小时调度；不接入用量 `RefreshCoordinator`，不导入凭据模块。Rust 适配器仅调用官方 Tauri Updater 和原生确认；前端只显示快照和发送检查／安装意图。固定渠道、版本绑定签名、安装位置预检及发布防护见 [macOS 更新说明](macos-updates.md)。默认构建不启用正式更新，真实升级验证仍需另行完成。

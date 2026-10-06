@@ -37,11 +37,6 @@ const defaults = {
     notifyNinety: true,
     notifyHundred: true,
     notifyReset: false,
-    claudeEnabled: false,
-    defaultProduct: "codex" as const,
-    notifyClaudeWaiting: true,
-    notifyClaudeCompleted: true,
-    notifyClaudeFailed: true,
   }),
   saveInterval: vi.fn().mockResolvedValue({
     intervalMinutes: 5,
@@ -51,11 +46,6 @@ const defaults = {
     notifyNinety: true,
     notifyHundred: true,
     notifyReset: false,
-    claudeEnabled: false,
-    defaultProduct: "codex" as const,
-    notifyClaudeWaiting: true,
-    notifyClaudeCompleted: true,
-    notifyClaudeFailed: true,
   }),
   saveSettings: vi.fn(async (settings: RefreshSettings) => settings),
   loadAutostart: vi.fn().mockResolvedValue(false),
@@ -71,29 +61,9 @@ const defaults = {
   subscribeWindowPreferences: vi.fn().mockResolvedValue(vi.fn()),
   subscribeWindowModeChanged: vi.fn().mockResolvedValue(vi.fn()),
   resizeView: vi.fn().mockResolvedValue(undefined),
-  detectBackdrop: vi.fn().mockResolvedValue("light" as const),
+  screenCaptureAllowed: vi.fn().mockResolvedValue(false),
   backdropPollIntervalMs: 10,
   loadAccountMode: vi.fn().mockResolvedValue({ mode: "subscription" as const }),
-  loadClaudeEnvironment: vi.fn().mockResolvedValue({
-    desktopInstalled: true,
-    desktopRunning: true,
-    codeAvailable: true,
-    taskSource: "local_claude_code_sessions" as const,
-    usageStatus: "unavailable" as const,
-  }),
-  loadHistory: vi.fn().mockResolvedValue({
-    range: "seven_days" as const,
-    windowId: "five_hour",
-    sampleCount: 3,
-    currentRemaining: 58,
-    minimumRemaining: 41,
-    maximumRemaining: 83,
-    points: [
-      { queriedAt: Date.now() - 120_000, remainingPercent: 83 },
-      { queriedAt: Date.now() - 60_000, remainingPercent: 66 },
-      { queriedAt: Date.now(), remainingPercent: 58 },
-    ],
-  }),
   loadDiagnosticReport: vi.fn().mockResolvedValue({
     appVersion: "1.2.6",
     os: "macos",
@@ -107,11 +77,6 @@ const defaults = {
       notifyNinety: true,
       notifyHundred: true,
       notifyReset: false,
-      claudeEnabled: false,
-      defaultProduct: "codex" as const,
-      notifyClaudeWaiting: true,
-      notifyClaudeCompleted: true,
-      notifyClaudeFailed: true,
     },
   }),
 };
@@ -119,9 +84,38 @@ const defaults = {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("App", () => {
+  it("uses one system tone across detailed, settings and compact views without screen access", async () => {
+    vi.stubGlobal("matchMedia", () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    const sample = vi.fn();
+    render(
+      <App
+        {...defaults}
+        sampleBackdropLuminance={sample}
+        saveWindowPreferences={vi.fn(async (p: WindowPreferences) => p)}
+      />,
+    );
+    await screen.findAllByRole("progressbar");
+    expect(screen.getByRole("main")).toHaveAttribute("data-surface-tone", "dark");
+    expect(screen.queryByRole("button", { name: "Claude" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /趋势|Trends/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /设置|Settings/ }));
+    expect(screen.getByRole("main")).toHaveAttribute("data-surface-tone", "dark");
+    fireEvent.click(screen.getByRole("button", { name: /完成|Done/ }));
+    await screen.findByRole("button", { name: /切换到紧凑模式|Switch to compact mode/ });
+    fireEvent.click(screen.getByRole("button", { name: /切换到紧凑模式|Switch to compact mode/ }));
+    await screen.findByText("5h 58%");
+    expect(screen.getByRole("main")).toHaveAttribute("data-surface-tone", "dark");
+    expect(sample).not.toHaveBeenCalled();
+  });
+
   it("shows a redacted diagnostic summary from settings", async () => {
     const loadDiagnosticReport = vi.fn().mockResolvedValue({
       appVersion: "1.2.6",
@@ -139,31 +133,6 @@ describe("App", () => {
     expect(await screen.findByText("available")).toBeInTheDocument();
     expect(screen.getByText("ready")).toBeInTheDocument();
     expect(screen.getByText(/不包含 Access Token|contains no access token/)).toBeInTheDocument();
-  });
-
-  it("shows locally stored quota history without uploading it", async () => {
-    const loadHistory = vi.fn().mockResolvedValue({
-      range: "seven_days" as const,
-      windowId: "five_hour",
-      sampleCount: 3,
-      currentRemaining: 58,
-      minimumRemaining: 41,
-      maximumRemaining: 83,
-      points: [
-        { queriedAt: Date.now() - 120_000, remainingPercent: 83 },
-        { queriedAt: Date.now() - 60_000, remainingPercent: 66 },
-        { queriedAt: Date.now(), remainingPercent: 58 },
-      ],
-    });
-    render(<App {...defaults} loadHistory={loadHistory} />);
-
-    fireEvent.click(await screen.findByRole("button", { name: /趋势|Trends/ }));
-
-    expect(
-      await screen.findByRole("img", { name: /3 个原始采样点|3 original samples/ }),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/基于 3 个本地采样点|Based on 3 local samples/)).toBeInTheDocument();
-    expect(loadHistory).toHaveBeenCalledWith("seven_days", "five_hour");
   });
 
   it("hides the detailed widget while leaving the status bar process running", async () => {
@@ -200,68 +169,6 @@ describe("App", () => {
     fireEvent.click(hide);
 
     expect(hideWindow).toHaveBeenCalledOnce();
-  });
-  it("lets the user select Claude even before the integration is enabled", async () => {
-    render(<App {...defaults} />);
-    const claude = await screen.findByRole("button", { name: "Claude" });
-    expect(claude).not.toBeDisabled();
-    fireEvent.click(claude);
-    expect(
-      await screen.findByText(/启用 Claude 集成后|Enable Claude integration/),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /自动|Auto/ })).not.toBeInTheDocument();
-  });
-
-  it("shows a transparent Claude usage fallback without inventing a percentage", async () => {
-    render(
-      <App
-        {...defaults}
-        loadSettings={vi.fn().mockResolvedValue({
-          ...(await defaults.loadSettings()),
-          claudeEnabled: true,
-          defaultProduct: "claude",
-        })}
-      />,
-    );
-    expect(await screen.findByText(/Claude 共享额度|Claude shared usage/)).toBeInTheDocument();
-    expect(screen.getByText(/不显示估算百分比|No estimated percentage/)).toBeInTheDocument();
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-  });
-
-  it("keeps compact task status scoped to the selected product", async () => {
-    render(
-      <App
-        {...defaults}
-        loadWindowPreferences={vi.fn().mockResolvedValue({
-          ...windowPreferences,
-          mode: "compact",
-        })}
-        loadSettings={vi.fn().mockResolvedValue({
-          ...(await defaults.loadSettings()),
-          claudeEnabled: true,
-          defaultProduct: "claude",
-        })}
-        loadTasks={vi.fn().mockResolvedValue({
-          queriedAt: Date.now(),
-          tasks: [
-            {
-              product: "codex",
-              id: "codex-active",
-              sessionId: "codex-active",
-              title: "Codex active task",
-              project: "Codex",
-              status: "executing",
-              startedAt: Date.now() - 1_000,
-              updatedAt: Date.now(),
-            },
-          ],
-        })}
-      />,
-    );
-    expect(await screen.findByText(/准备接收任务|Ready for a new task/)).toBeInTheDocument();
-    expect(screen.queryByText(/执行中|Executing/)).not.toBeInTheDocument();
-    expect(screen.getByText("C")).toBeInTheDocument();
-    expect(screen.queryByText(/Subscription|订阅/)).not.toBeInTheDocument();
   });
   it("renders remaining quota as a countdown from 100 to 0", async () => {
     render(<App {...defaults} />);
@@ -450,7 +357,7 @@ describe("App", () => {
     expect(screen.getByText("完成任务 5")).toBeInTheDocument();
     expect(screen.queryByText("完成任务 6")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /完成任务 3.*Codex/ }));
-    expect(openTask).toHaveBeenCalledWith("codex", "019f0000-0000-7000-8000-000000000002");
+    expect(openTask).toHaveBeenCalledWith("019f0000-0000-7000-8000-000000000002");
   });
 
   it("opens an active task in its Codex thread", async () => {
@@ -478,53 +385,7 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /任务|Tasks/ }));
     fireEvent.click(screen.getByRole("button", { name: /修复重置机会.*Codex/ }));
-    expect(openTask).toHaveBeenCalledWith("codex", "019f0000-0000-7000-8000-000000000099");
-  });
-
-  it("strictly separates Claude and Codex tasks and keeps Codex tasks clickable", async () => {
-    const openTask = vi.fn().mockResolvedValue(undefined);
-    const now = Date.now();
-    render(
-      <App
-        {...defaults}
-        openTask={openTask}
-        loadTasks={vi.fn().mockResolvedValue({
-          queriedAt: now,
-          tasks: [
-            {
-              product: "codex" as const,
-              id: "codex-active",
-              sessionId: "019f0000-0000-7000-8000-000000000088",
-              title: "Codex 独立任务",
-              project: "Token用量",
-              status: "executing" as const,
-              startedAt: now - 5_000,
-              updatedAt: now,
-            },
-            {
-              product: "claude" as const,
-              id: "claude-active",
-              sessionId: "14de44c6-fd5a-421b-a9e3-f1eb19f03270",
-              title: "Claude 独立任务",
-              project: "Token用量",
-              status: "thinking" as const,
-              startedAt: now - 4_000,
-              updatedAt: now,
-            },
-          ],
-        })}
-      />,
-    );
-
-    fireEvent.click(await screen.findByRole("button", { name: /任务|Tasks/ }));
-    expect(await screen.findByText("Codex 独立任务")).toBeInTheDocument();
-    expect(screen.queryByText("Claude 独立任务")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Codex 独立任务.*Codex/ }));
-    expect(openTask).toHaveBeenCalledWith("codex", "019f0000-0000-7000-8000-000000000088");
-
-    fireEvent.click(screen.getByRole("button", { name: "Claude" }));
-    expect(await screen.findByText("Claude 独立任务")).toBeInTheDocument();
-    expect(screen.queryByText("Codex 独立任务")).not.toBeInTheDocument();
+    expect(openTask).toHaveBeenCalledWith("019f0000-0000-7000-8000-000000000099");
   });
 
   it("subscribes before loading the initial task snapshot", async () => {
@@ -619,29 +480,6 @@ describe("App", () => {
         expect.objectContaining({ showDockIcon: true }),
       ),
     );
-  });
-
-  it("adapts to a dark surface behind the widget", async () => {
-    const detectBackdrop = vi.fn().mockResolvedValue("dark");
-    render(<App {...defaults} detectBackdrop={detectBackdrop} backdropPollIntervalMs={10_000} />);
-    await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-dark"));
-    expect(detectBackdrop).toHaveBeenCalledTimes(1);
-  });
-
-  it("adapts to a light surface behind the widget", async () => {
-    render(<App {...defaults} detectBackdrop={vi.fn().mockResolvedValue("light")} />);
-    await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-light"));
-  });
-
-  it("changes after the surface behind the widget changes", async () => {
-    const samples = ["light", "light", "dark", "dark"] as const;
-    let index = 0;
-    const detectBackdrop = vi.fn(async () => samples[Math.min(index++, samples.length - 1)]);
-    render(<App {...defaults} detectBackdrop={detectBackdrop} />);
-
-    await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-light"));
-    await waitFor(() => expect(document.querySelector("main")).toHaveClass("backdrop-dark"));
-    expect(detectBackdrop).toHaveBeenCalledTimes(4);
   });
 
   it("switches directly from compact to standard mode", async () => {

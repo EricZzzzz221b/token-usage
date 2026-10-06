@@ -1,0 +1,13 @@
+{
+  "bundle": { "createUpdaterArtifacts": false },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://raw.githubusercontent.com/EricZzzzz221b/token-usage/macos-stable/updates/macos/stable.json"
+      ],
+      "requireSignedVersion": true,
+      "allowDowngrades": false
+    }
+  }
+}

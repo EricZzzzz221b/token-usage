@@ -1,0 +1,70 @@
+.update-panel {
+  margin: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid currentColor;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.update-heading,
+.update-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.update-actions {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.update-panel button {
+  color: inherit;
+  font: inherit;
+  min-height: 32px;
+  cursor: pointer;
+}
+.update-panel button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.update-panel button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+.update-panel progress {
+  display: block;
+  width: 100%;
+}
+.update-panel p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.update-notice {
+  position: absolute;
+  z-index: 4;
+  right: 12px;
+  bottom: 8px;
+  max-width: calc(100% - 24px);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.update-compact-notice {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+.update-notice:focus-visible,
+.update-compact-notice:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}

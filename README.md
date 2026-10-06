@@ -4,13 +4,13 @@
 
 <h1 align="center">Token用量</h1>
 
-<p align="center"><strong>不用切回 Codex 或 Claude，也能随时知道额度还剩多少、任务做到哪了。</strong></p>
+<p align="center"><strong>不用切回 Codex，也能随时知道额度还剩多少、任务做到哪了。</strong></p>
 
 <p align="center">一款常驻 Windows 系统托盘与 macOS 状态栏的本地 AI 用量和任务监控工具。</p>
 
 <p align="center">
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/latest"><img src="https://img.shields.io/github/v/release/EricZzzzz221b/token-usage?label=latest&amp;cacheSeconds=300" alt="最新版本"></a>
-  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.7"><img src="https://img.shields.io/badge/macOS-v1.2.7-111111?logo=apple" alt="macOS v1.2.7"></a>
+  <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.8"><img src="https://img.shields.io/badge/macOS-v1.2.8-111111?logo=apple" alt="macOS v1.2.8"></a>
   <a href="https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.7"><img src="https://img.shields.io/badge/Windows-v1.2.7-0078D4?logo=windows11" alt="Windows v1.2.7"></a>
 </p>
 
@@ -22,7 +22,9 @@
 
 Token用量把 Codex 最常被打断查看的两件事放进一个小浮窗：**额度还有多少，以及正在运行的任务有没有完成**。你可以切到浏览器、设计软件或其他项目继续工作，通过状态栏就能看到任务处于思考、执行还是等待操作；任务完成后还会收到系统通知，并可从最近完成列表一键返回对应的 Codex 会话。
 
-v1.2.7 新增本地用量趋势页，可查看 24 小时、7 天和 30 天的额度变化、导出 CSV，并改进 macOS 液态玻璃背景下的对比度。隐藏浮窗功能仍可在 macOS 状态栏或 Windows 系统托盘保持运行。Claude 集成仍支持在 Codex 与 Claude 之间切换，并只读扫描本机 Claude Code 已生成的会话事件。Anthropic 当前没有向第三方桌面工具提供可安全读取的个人订阅剩余额度 API，因此 Claude 页面会明确显示额度不可用，不会用本地 token 估算冒充官方百分比。
+v1.2.8 发布当前最新的 Codex-only 与视觉简化版本：保留用量和任务监控，移除 Claude 来源及历史趋势页面，统一为单层原生玻璃与共享明暗主题；macOS Apple Silicon 同时接入 GitHub 应用内更新。
+
+浮窗支持紧凑与详细模式，并改进了 macOS 液态玻璃背景下的对比度。隐藏浮窗功能仍可在 macOS 状态栏或 Windows 系统托盘保持运行。
 
 应用会自动识别当前官方账号的使用模式。订阅账号显示套餐和 5 小时、7 天用量窗口；API 模式则按官方返回结果展示 Credits。所有凭据、用量和任务判断都在本机处理，不需要把 Access Token 或会话内容交给第三方服务。
 
@@ -58,12 +60,10 @@ v1.2.7 新增本地用量趋势页，可查看 24 小时、7 天和 30 天的额
 - 以“满额 100%，用尽 0%”的方式显示剩余额度
 - 自动识别订阅或 API 模式；API 模式下展示 Credits 余额与官方返回的到期时间
 - 展示官方返回的使用限额重置机会，并支持默认折叠
-- 本地历史趋势页，查看最近 24 小时、7 天和 30 天的剩余额度变化
 - 系统托盘/状态栏可选择显示 5 小时或 7 天窗口
 - 详细和紧凑两种浮窗，可从浮窗或托盘快速切换
 - 立即刷新、自动刷新间隔、余额阈值和额度重置通知
 - 实时识别本机 Codex 任务，分别显示进行中任务、运行时长、最近 5 条完成记录和完成通知
-- macOS 测试版可独立启用 Claude Code 本地任务监控，并切换 Codex / Claude 来源
 - 进行中任务与最近完成记录均可一键打开对应 Codex 会话
 - 菜单栏在任务运行时同时显示活动任务数与剩余额度
 - 始终置顶、锁定位置、鼠标穿透、窗口拖动和登录时启动
@@ -94,12 +94,14 @@ v1.2.7 新增本地用量趋势页，可查看 24 小时、7 天和 30 天的额
 
 | 平台                             | 状态   | 版本与下载                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS 13+ Apple Silicon          | 可下载 | [v1.2.7](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.7) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.7/TokenUsage_1.2.7_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.7/SHA256SUMS-1.2.7.txt)                                                                                                                                                                     |
+| macOS 13+ Apple Silicon          | 可下载 | [v1.2.8](https://github.com/EricZzzzz221b/token-usage/releases/tag/v1.2.8) · [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.8/TokenUsage_1.2.8_arm64.dmg) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.8/SHA256SUMS-1.2.8.txt)                                                                                                                                                                     |
 | Windows 11 / Windows 10 22H2 x64 | 可下载 | [v1.2.7](https://github.com/EricZzzzz221b/token-usage/releases/tag/windows-v1.2.7) · [MSI](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.7/TokenUsage_Windows_1.2.7_x64.msi) · [EXE](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.7/TokenUsage_Windows_1.2.7_x64-setup.exe) · [SHA-256](https://github.com/EricZzzzz221b/token-usage/releases/download/windows-v1.2.7/SHA256SUMS-Windows-1.2.7.txt) |
 
-### macOS v1.2.7
+### macOS v1.2.8
 
-下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.7/TokenUsage_1.2.7_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名；首次启动请在 Finder 中右键应用并选择“打开”。Claude 集成默认关闭，可在设置中启用；它只读取 `~/.claude/projects` 下 Claude Code 已生成的本地 JSONL 事件。
+下载 [DMG](https://github.com/EricZzzzz221b/token-usage/releases/download/v1.2.8/TokenUsage_1.2.8_arm64.dmg) 后，将 `Token用量.app` 拖入 `Applications`。当前包采用 ad-hoc 签名，未经 Apple 公证；首次安装或更新后启动可能被 macOS 拦截，请按照系统“隐私与安全性”的批准流程处理。不要删除安全属性或关闭 Gatekeeper。
+
+v1.2.7 及更早版本没有更新器，首次接入需手动安装 v1.2.8 DMG。v1.2.8 内置正式 Tauri 更新公钥，后续从独立 macOS stable 渠道检查更新；真实 N → N+1 升级及权限保留尚未验收。
 
 安装前建议退出旧版；遇到任务状态或额度显示异常时，请在 [Issues](https://github.com/EricZzzzz221b/token-usage/issues) 中附上应用版本和复现步骤，但不要上传 `auth.json` 或完整 Codex 会话日志。
 
@@ -118,10 +120,9 @@ Windows 目前仅提供 x64；ARM64 尚未经过真实 Windows ARM64 构建与�
 
 - OAuth 凭据只在本机内存中读取，只用于请求 `https://chatgpt.com/backend-api/wham/usage`。
 - 任务状态只增量读取本机 Codex 会话生命周期事件；不上传或另行保存完整提示词、回答、命令输出和文件内容。
-- Claude 集成默认关闭；启用后只读扫描 Claude Code 本地事件，不读取 Claude Desktop Cookie、IndexedDB 或内部数据库。
 - 不保存、记录或上传 Access Token、Refresh Token、邮箱、Account ID 或原始认证内容。
 - Windows 不读取 Credential Manager：目前没有经过验证的 Codex 凭据格式，因此不会猜测实现。
-- 本地历史只包含标准化用量，设置和缓存使用 Tauri 系统目录（Windows 为 AppData）。
+- 设置和缓存使用 Tauri 系统目录（Windows 为 AppData）。
 - 应用不包含遥测和行为追踪。
 
 ## 本地开发
@@ -138,6 +139,8 @@ npm run tauri:dev
 
 - [Windows 构建说明](docs/build-windows.md)
 - [Windows 与 macOS 差异及已知限制](docs/windows-platform-notes.md)
+- [GitHub 自动更新（无需 Apple 证书）](docs/github-auto-updates.md)（仍需正式 Tauri 更新密钥与真实升级验收）
+- [macOS 应用内更新与正式发布配置](docs/macos-updates.md)（默认未启用；区分 GitHub ad-hoc 与 Apple 公证模式）
 - [技术架构](docs/architecture.md)
 - [贡献指南](CONTRIBUTING.md)
 

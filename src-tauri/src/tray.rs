@@ -7,7 +7,7 @@ use tauri::{
 };
 
 use crate::refresh::{RefreshCoordinator, TrayWindow, UsageView};
-use crate::tasks::{is_active, ProductSource, TaskMonitor, TaskStatus};
+use crate::tasks::{is_active, TaskMonitor, TaskStatus};
 
 const TRAY_ID: &str = "token-usage";
 const SUMMARY_ID: &str = "usage-summary";
@@ -17,10 +17,19 @@ const MODE_ID: &str = "toggle-window-mode";
 const INTERACTION_ID: &str = "restore-interaction";
 const FIVE_HOUR_ID: &str = "tray-five-hour";
 const SEVEN_DAY_ID: &str = "tray-seven-day";
+const UPDATE_ID: &str = "app-updates";
+struct UpdateMenuItem(MenuItem<tauri::Wry>);
 const QUIT_ID: &str = "quit";
 static MENU_SNAPSHOT: OnceLock<Mutex<Option<(String, TrayWindow)>>> = OnceLock::new();
 
 pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()> {
+    app.manage(UpdateMenuItem(MenuItem::with_id(
+        app,
+        UPDATE_ID,
+        "应用更新 / App updates",
+        true,
+        None::<&str>,
+    )?));
     let menu = build_menu(app, "正在读取用量…", TrayWindow::FiveHour)?;
 
     #[cfg(target_os = "windows")]
@@ -60,6 +69,11 @@ pub fn setup(app: &mut App, coordinator: RefreshCoordinator) -> tauri::Result<()
             FIVE_HOUR_ID => select_tray_window(app, &coordinator, TrayWindow::FiveHour),
             SEVEN_DAY_ID => select_tray_window(app, &coordinator, TrayWindow::SevenDay),
             INTERACTION_ID => crate::window::disable_click_through(app),
+            UPDATE_ID => {
+                show_window(app);
+                let _ = crate::window::resize_for_view(app, "settings");
+                let _ = app.emit("updates://open-settings", ());
+            }
             QUIT_ID => app.exit(0),
             _ => {}
         });
@@ -86,10 +100,6 @@ pub fn update(app: &AppHandle, view: &UsageView, tray_window: TrayWindow) {
         .filter(|task| is_active(&task.status))
         .collect::<Vec<_>>();
     if let Some(task) = active_tasks.first() {
-        let product = match task.product {
-            ProductSource::Codex => "Codex",
-            ProductSource::Claude => "Claude",
-        };
         let status = &task.status;
         let status_text = match status {
             TaskStatus::Thinking => "思考中",
@@ -107,7 +117,7 @@ pub fn update(app: &AppHandle, view: &UsageView, tray_window: TrayWindow) {
         };
         let elapsed = elapsed_label(task.started_at);
         title = format!("{status_text}{elapsed} · {title}");
-        tooltip = format!("{product} {status_text}{elapsed}{count} · {tooltip}");
+        tooltip = format!("Codex {status_text}{elapsed}{count} · {tooltip}");
     }
     let _ = tray.set_title(Some(title));
     let _ = tray.set_tooltip(Some(tooltip));
@@ -120,6 +130,19 @@ pub fn update(app: &AppHandle, view: &UsageView, tray_window: TrayWindow) {
                 *previous = Some(next);
             }
         }
+    }
+}
+
+// Presentation adapter only; checking/downloading/installing remains in UpdateService.
+pub fn update_notice(app: &AppHandle, snapshot: &crate::updates::Snapshot) {
+    if let Some(item) = app.try_state::<UpdateMenuItem>() {
+        let label = match (&snapshot.update, snapshot.phase) {
+            (Some(update), crate::updates::Phase::Available) => {
+                format!("发现新版本 {} / Update available", update.version)
+            }
+            _ => "应用更新 / App updates".into(),
+        };
+        let _ = item.0.set_text(label);
     }
 }
 
@@ -136,11 +159,11 @@ fn elapsed_label(started_at: i64) -> String {
     }
 }
 
-fn build_menu<R: tauri::Runtime, M: Manager<R>>(
+fn build_menu<M: Manager<tauri::Wry>>(
     manager: &M,
     summary_text: &str,
     tray_window: TrayWindow,
-) -> tauri::Result<Menu<R>> {
+) -> tauri::Result<Menu<tauri::Wry>> {
     let summary = MenuItem::with_id(manager, SUMMARY_ID, summary_text, false, None::<&str>)?;
     let show = MenuItem::with_id(manager, SHOW_ID, "显示 Token用量", true, None::<&str>)?;
     let refresh = MenuItem::with_id(manager, REFRESH_ID, "立即刷新", true, None::<&str>)?;
@@ -164,6 +187,7 @@ fn build_menu<R: tauri::Runtime, M: Manager<R>>(
     let interaction =
         MenuItem::with_id(manager, INTERACTION_ID, "恢复浮窗交互", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(manager)?;
+    let updates = manager.state::<UpdateMenuItem>();
     let quit = MenuItem::with_id(manager, QUIT_ID, "退出", true, None::<&str>)?;
     Menu::with_items(
         manager,
@@ -176,6 +200,7 @@ fn build_menu<R: tauri::Runtime, M: Manager<R>>(
             &seven_day,
             &interaction,
             &separator,
+            &updates.0,
             &quit,
         ],
     )

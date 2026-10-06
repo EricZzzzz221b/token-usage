@@ -1,11 +1,11 @@
-mod claude;
 mod credentials;
 mod error;
-mod history;
 mod model;
 mod refresh;
 mod tasks;
 mod tray;
+mod update_backend;
+mod updates;
 mod usage;
 mod window;
 
@@ -21,24 +21,8 @@ fn get_tasks(monitor: State<'_, tasks::TaskMonitor>) -> tasks::TaskSnapshot {
 }
 
 #[tauri::command]
-fn claude_environment() -> claude::ClaudeEnvironmentReport {
-    claude::inspect_environment()
-}
-
-#[tauri::command]
-fn open_task(product: tasks::ProductSource, session_id: String) -> Result<(), UsageErrorPayload> {
-    if session_id.is_empty()
-        || session_id.len() > 64
-        || !session_id
-            .chars()
-            .all(|character| character.is_ascii_hexdigit() || character == '-')
-    {
-        return Err(UsageErrorPayload::from(error::UsageError::InvalidSettings));
-    }
-    let url = match product {
-        tasks::ProductSource::Codex => format!("codex://threads/{session_id}"),
-        tasks::ProductSource::Claude => "claude://claude.ai/code".into(),
-    };
+fn open_task(session_id: String) -> Result<(), UsageErrorPayload> {
+    let url = codex_task_url(&session_id).map_err(UsageErrorPayload::from)?;
     #[cfg(target_os = "macos")]
     let result = std::process::Command::new("open").arg(&url).spawn();
     #[cfg(target_os = "windows")]
@@ -52,6 +36,33 @@ fn open_task(product: tasks::ProductSource, session_id: String) -> Result<(), Us
         .map_err(|_| UsageErrorPayload::from(error::UsageError::WindowUnavailable))
 }
 
+fn codex_task_url(session_id: &str) -> Result<String, error::UsageError> {
+    if session_id.is_empty()
+        || session_id.len() > 64
+        || !session_id
+            .chars()
+            .all(|character| character.is_ascii_hexdigit() || character == '-')
+    {
+        return Err(error::UsageError::InvalidSettings);
+    }
+    Ok(format!("codex://threads/{session_id}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opens_only_valid_codex_thread_links() {
+        let id = "019f0000-0000-7000-8000-000000000099";
+        assert_eq!(codex_task_url(id).unwrap(), format!("codex://threads/{id}"));
+        for invalid in ["", "../../thread", "abc?redirect=other", "abc;open-other"] {
+            assert!(codex_task_url(invalid).is_err());
+        }
+        assert!(codex_task_url(&"a".repeat(65)).is_err());
+    }
+}
+
 #[tauri::command]
 fn credential_status() -> CredentialReport {
     credentials::inspect_credentials()
@@ -60,48 +71,6 @@ fn credential_status() -> CredentialReport {
 #[tauri::command]
 fn account_mode() -> AccountModeReport {
     credentials::inspect_account_mode()
-}
-
-#[tauri::command]
-fn get_usage_history(
-    app: tauri::AppHandle,
-    range: history::HistoryRange,
-    window_id: String,
-) -> Result<history::UsageHistorySeries, UsageErrorPayload> {
-    if window_id.is_empty()
-        || window_id.len() > 64
-        || !window_id
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '_')
-    {
-        return Err(UsageErrorPayload::from(error::UsageError::InvalidSettings));
-    }
-    history::read_series(&app, range, &window_id).map_err(UsageErrorPayload::from)
-}
-
-#[tauri::command]
-fn export_usage_history_to_path(
-    app: tauri::AppHandle,
-    range: history::HistoryRange,
-    window_id: String,
-    path: String,
-) -> Result<(), UsageErrorPayload> {
-    if window_id.is_empty()
-        || window_id.len() > 64
-        || !window_id
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '_')
-    {
-        return Err(UsageErrorPayload::from(error::UsageError::InvalidSettings));
-    }
-    let csv = history::export_csv(&app, range, &window_id).map_err(UsageErrorPayload::from)?;
-    std::fs::write(path, csv)
-        .map_err(|_| UsageErrorPayload::from(error::UsageError::SettingsUnavailable))
-}
-
-#[tauri::command]
-fn clear_usage_history(app: tauri::AppHandle) -> Result<(), UsageErrorPayload> {
-    history::clear(&app).map_err(UsageErrorPayload::from)
 }
 
 #[tauri::command]
@@ -281,9 +250,66 @@ fn resize_window_for_view(app: tauri::AppHandle, view: String) -> Result<(), Usa
     window::resize_for_view(&app, &view).map_err(UsageErrorPayload::from)
 }
 
+#[cfg(target_os = "macos")]
 #[tauri::command]
-fn backdrop_is_dark(app: tauri::AppHandle) -> Result<bool, UsageErrorPayload> {
-    window::backdrop_is_dark(&app).map_err(UsageErrorPayload::from)
+fn sync_surface_tone(app: tauri::AppHandle, dark: bool) -> Result<bool, UsageErrorPayload> {
+    let window = window::main_window(&app).map_err(UsageErrorPayload::from)?;
+    let ns_view = window
+        .ns_view()
+        .map_err(|_| UsageErrorPayload::from(error::UsageError::WindowUnavailable))?;
+    unsafe extern "C" {
+        fn token_usage_sync_surface_tone(view_pointer: *mut std::ffi::c_void, dark: bool) -> bool;
+    }
+    Ok(unsafe { token_usage_sync_surface_tone(ns_view, dark) })
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn sync_surface_tone(dark: bool) -> bool {
+    let _ = dark;
+    false
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn screen_capture_allowed() -> bool {
+    unsafe extern "C" {
+        fn token_usage_screen_capture_allowed() -> bool;
+    }
+    unsafe { token_usage_screen_capture_allowed() }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn screen_capture_allowed() -> bool {
+    false
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+fn sample_backdrop_luminance(app: tauri::AppHandle) -> Result<f64, UsageErrorPayload> {
+    let window = window::main_window(&app).map_err(UsageErrorPayload::from)?;
+    let ns_view = window
+        .ns_view()
+        .map_err(|_| UsageErrorPayload::from(error::UsageError::WindowUnavailable))?;
+    unsafe extern "C" {
+        fn token_usage_sample_backdrop_luminance(view_pointer: *mut std::ffi::c_void) -> f64;
+    }
+    let luminance = unsafe { token_usage_sample_backdrop_luminance(ns_view) };
+    if !luminance.is_finite() || !(0.0..=1.0).contains(&luminance) {
+        return Err(UsageErrorPayload::from(
+            error::UsageError::WindowUnavailable,
+        ));
+    }
+    Ok(luminance.clamp(0.0, 1.0))
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+fn sample_backdrop_luminance() -> Result<f64, UsageErrorPayload> {
+    Err(UsageErrorPayload::from(
+        error::UsageError::WindowUnavailable,
+    ))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -324,17 +350,19 @@ pub fn run() {
                     }
                 });
             }
+            let updates = update_backend::service(app.handle().clone());
+            app.manage(updates.clone());
+            updates.start();
             coordinator.start(app.handle().clone());
             task_monitor.start(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            update_backend::get_update_state,
+            update_backend::check_for_updates,
+            update_backend::install_update,
             credential_status,
             account_mode,
-            get_usage_history,
-            export_usage_history_to_path,
-            clear_usage_history,
-            claude_environment,
             get_tasks,
             open_task,
             get_usage,
@@ -352,7 +380,9 @@ pub fn run() {
             hide_main_window,
             start_window_drag,
             resize_window_for_view,
-            backdrop_is_dark
+            sync_surface_tone,
+            screen_capture_allowed,
+            sample_backdrop_luminance,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Token Usage");

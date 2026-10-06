@@ -2,7 +2,7 @@
 
 - 状态：已接受
 - 日期：2026-07-11
-- 更新：2026-07-12
+- 更新：2026-10-06
 
 ## 决策
 
@@ -10,12 +10,9 @@
 
 在 macOS 13–15，继续使用 `window-vibrancy` 和 `NSVisualEffectView` 作为兼容回退。前端不再使用 `backdrop-filter` 模拟系统玻璃。
 
-玻璃设置只保留苹果公开提供的两个样式：
+当前使用单层标准样式 `NSGlassEffectViewStyleRegular`，不通过透明度混合两层玻璃。旧 glassLevel 配置仍可读取，但没有新增玻璃强度控件。
 
-- 清透：`NSGlassEffectViewStyleClear`
-- 标准：`NSGlassEffectViewStyleRegular`
-
-透明度滑块映射到 `NSGlassEffectView.tintColor` 的色调强度，而不是改变整个 WebView 的透明度。
+原生玻璃与前端使用同一 SurfaceTone。只有原生层确认成功且系统未开启减少透明度／增加对比度时，CSS 才采用 6% 的轻微底色；其余情况使用可读表面。原生玻璃不依赖屏幕录制权限，背景亮度采样是独立的可选增强。
 
 ## 原因
 
@@ -26,7 +23,7 @@
 
 ## 后果
 
-- macOS 26 是 Liquid Glass 的主要验证环境。
+- macOS 26/27 通过运行时能力检测使用 Liquid Glass。本机 macOS 27.0.1 已通过 contentView、三种模式尺寸、圆角及原生明暗外观检查；macOS 26 和 macOS 13–15 仍需对应系统实机验收。
 - macOS 13–15 的外观是传统 vibrancy，不保证与 macOS 26 完全一致。
 - “浓郁”旧值在读取时迁移为“标准”。
 - 鼠标穿透后必须可通过菜单栏恢复交互。

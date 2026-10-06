@@ -8,7 +8,6 @@ use tokio::sync::Mutex;
 use crate::{
     credentials,
     error::UsageError,
-    history,
     model::{RateLimitResetCredits, UsageSnapshot},
     tray,
     usage::UsageClient,
@@ -44,25 +43,6 @@ pub struct RefreshSettings {
     pub notify_hundred: bool,
     #[serde(default)]
     pub notify_reset: bool,
-    #[serde(default)]
-    pub claude_enabled: bool,
-    #[serde(default)]
-    pub default_product: ProductSourceSetting,
-    #[serde(default = "default_true")]
-    pub notify_claude_waiting: bool,
-    #[serde(default = "default_true")]
-    pub notify_claude_completed: bool,
-    #[serde(default = "default_true")]
-    pub notify_claude_failed: bool,
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ProductSourceSetting {
-    #[default]
-    Codex,
-    Claude,
-    Auto,
 }
 
 impl Default for RefreshSettings {
@@ -75,11 +55,6 @@ impl Default for RefreshSettings {
             notify_ninety: true,
             notify_hundred: true,
             notify_reset: false,
-            claude_enabled: false,
-            default_product: ProductSourceSetting::Codex,
-            notify_claude_waiting: true,
-            notify_claude_completed: true,
-            notify_claude_failed: true,
         }
     }
 }
@@ -109,7 +84,6 @@ struct CoordinatorState {
     notified: std::collections::HashSet<String>,
     last_reset_credits: Option<RateLimitResetCredits>,
     last_reset_credits_at: Option<i64>,
-    history_appends_since_compaction: usize,
 }
 
 #[derive(Clone)]
@@ -239,11 +213,6 @@ impl RefreshCoordinator {
                         }
                     }
                     process_notifications(app, &mut state, &snapshot);
-                    history::append_snapshot(
-                        app,
-                        &snapshot,
-                        &mut state.history_appends_since_compaction,
-                    );
                     state.last_good = Some(snapshot);
                     state.last_error = None;
                     state.transient_failures = 0;
@@ -419,6 +388,27 @@ mod tests {
     }
 
     #[test]
+    fn ignores_legacy_claude_settings_and_defaults_to_codex_behavior() {
+        let settings: RefreshSettings = serde_json::from_str(
+            r#"{
+                "intervalMinutes": 10,
+                "usageEnabled": true,
+                "defaultProduct": "claude",
+                "claudeEnabled": true,
+                "notifyClaudeWaiting": false
+            }"#,
+        )
+        .expect("legacy Claude settings should remain readable");
+
+        assert_eq!(settings.interval_minutes, 10);
+        assert!(settings.usage_enabled);
+        let encoded = serde_json::to_value(settings).expect("serialize Codex-only settings");
+        assert!(encoded.get("defaultProduct").is_none());
+        assert!(encoded.get("claudeEnabled").is_none());
+        assert!(encoded.get("notifyClaudeWaiting").is_none());
+    }
+
+    #[test]
     fn preserves_last_good_after_transient_error() {
         let state = CoordinatorState {
             settings: RefreshSettings::default(),
@@ -442,7 +432,6 @@ mod tests {
             notified: Default::default(),
             last_reset_credits: None,
             last_reset_credits_at: None,
-            history_appends_since_compaction: 0,
         };
         match view_from_state(&state, 2_000) {
             UsageView::Ready { last_error, .. } => {
@@ -463,7 +452,6 @@ mod tests {
             notified: Default::default(),
             last_reset_credits: None,
             last_reset_credits_at: None,
-            history_appends_since_compaction: 0,
         };
         match view_from_state(&state, 2_000) {
             UsageView::Error { code, .. } => assert_eq!(code, "authentication_expired"),
